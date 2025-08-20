@@ -25,7 +25,7 @@ const safeParseCookie = (value: string) => {
   }
 }
 
-// Create a cached version of the Supabase client for Server Components (READ-ONLY)
+// Create a cached version of the Supabase client for Server Components
 export const createClient = cache(async () => {
   if (!isSupabaseConfigured) {
     console.warn("Supabase environment variables are not set. Using dummy client.")
@@ -52,15 +52,40 @@ export const createClient = cache(async () => {
       cookies: {
         getAll() {
           try {
-            return cookieStore.getAll()
+            const allCookies = cookieStore.getAll()
+            // Process cookies to handle Supabase tokens properly
+            return allCookies.map(cookie => ({
+              ...cookie,
+              value: safeParseCookie(cookie.value)
+            }))
           } catch (error) {
             console.warn("Failed to get cookies:", error)
             return []
           }
         },
         setAll(cookiesToSet) {
-          // Server Components cannot set cookies - this is a no-op
-          // Cookie setting should only happen in API routes or Server Actions
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              try {
+                // For Supabase auth cookies, use special handling
+                if (name.includes('supabase') || name.includes('auth')) {
+                  cookieStore.set(name, value, {
+                    ...options,
+                    secure: process.env.NODE_ENV === 'production',
+                    sameSite: 'lax',
+                    httpOnly: false,
+                    path: '/',
+                  })
+                } else {
+                  cookieStore.set(name, value, options)
+                }
+              } catch (error) {
+                console.warn(`Failed to set cookie ${name}:`, error)
+              }
+            })
+          } catch (error) {
+            console.warn("Failed to set cookies:", error)
+          }
         },
       },
     }

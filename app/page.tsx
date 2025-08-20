@@ -13,7 +13,7 @@ export default async function HomePage() {
   }
 
   // Check if user is authenticated
-  const supabase = createClient()
+  const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -25,7 +25,7 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <QuizDashboard user={user} />
+      <QuizDashboard user={{ id: user.id, email: user.email || "" }} />
     </div>
   )
 }

@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Users, BookOpen, BarChart3, Settings, Trash2, Plus, TrendingUp, Activity } from "lucide-react"
+import { Users, BookOpen, BarChart3, Settings, Trash2, Plus, TrendingUp, Activity, Cpu } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import QuestionGenerator from "@/components/question-generator"
+import { LMStudioModelSelector } from "@/components/lmstudio-model-selector"
+import { REVERSE_GRAMMAR_TYPE_MAPPING, REVERSE_DIFFICULTY_MAPPING } from "@/lib/ai/types"
 
 interface AdminStats {
   totalUsers: number
@@ -63,7 +65,18 @@ export default function AdminDashboard() {
     search: "",
   })
   const [isLoading, setIsLoading] = useState(true)
+  const [deletingQuestions, setDeletingQuestions] = useState<Set<string>>(new Set()) // 삭제 중인 문제 ID 추적
   const { toast } = useToast()
+
+  // 영어 문법 유형을 한글로 변환하는 헬퍼 함수
+  const getKoreanGrammarType = (englishType: string): string => {
+    return REVERSE_GRAMMAR_TYPE_MAPPING[englishType] || englishType
+  }
+
+  // 영어 난이도를 한글로 변환하는 헬퍼 함수
+  const getKoreanDifficulty = (englishDifficulty: string): string => {
+    return REVERSE_DIFFICULTY_MAPPING[englishDifficulty] || englishDifficulty
+  }
 
   useEffect(() => {
     fetchStats()
@@ -139,31 +152,76 @@ export default function AdminDashboard() {
   }
 
   const handleDeleteQuestion = async (questionId: string) => {
-    if (!confirm("Are you sure you want to delete this question?")) return
+    console.log("Attempting to delete question with ID:", questionId)
+    
+    // 이미 삭제 중인 문제인지 확인
+    if (deletingQuestions.has(questionId)) {
+      console.log("Question is already being deleted:", questionId)
+      return
+    }
+    
+    if (!confirm("정말로 이 문제를 삭제하시겠습니까?")) return
+
+    // 삭제 중 상태로 설정
+    setDeletingQuestions(prev => new Set(prev).add(questionId))
 
     try {
+      console.log("Sending DELETE request...")
       const response = await fetch("/api/admin/questions", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ questionId }),
       })
 
+      console.log("Response status:", response.status)
+      const responseData = await response.json()
+      console.log("Response data:", responseData)
+
       if (response.ok) {
         toast({
-          title: "Success",
-          description: "Question deleted successfully.",
+          title: "성공",
+          description: "문제가 성공적으로 삭제되었습니다.",
         })
-        fetchQuestions()
-        fetchStats() // Refresh stats
+        
+        // 즉시 UI에서 해당 문제 제거
+        setQuestions(prevQuestions => {
+          const updatedQuestions = prevQuestions.filter(q => q.id !== questionId)
+          console.log("Updated questions count:", updatedQuestions.length)
+          return updatedQuestions
+        })
+        
+        // 페이지가 비어있다면 이전 페이지로 이동
+        const remainingQuestions = questions.filter(q => q.id !== questionId).length
+        if (remainingQuestions === 0 && questionsPage > 1) {
+          setQuestionsPage(prev => prev - 1)
+        }
+        
+        // 통계 새로고침 (문제 목록은 이미 업데이트됨)
+        fetchStats()
+        
       } else {
-        throw new Error("Failed to delete question")
+        throw new Error(responseData.error || "Failed to delete question")
       }
     } catch (error) {
       console.error("Error deleting question:", error)
       toast({
-        title: "Error",
-        description: "Failed to delete question.",
+        title: "오류",
+        description: `문제 삭제에 실패했습니다: ${error}`,
         variant: "destructive",
+      })
+      
+      // 실패시 삭제 중 상태 해제
+      setDeletingQuestions(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(questionId)
+        return newSet
+      })
+    } finally {
+      // 성공시 삭제 중 상태 해제
+      setDeletingQuestions(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(questionId)
+        return newSet
       })
     }
   }
@@ -173,7 +231,7 @@ export default function AdminDashboard() {
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-600">Loading admin dashboard...</p>
+          <p className="text-gray-600">관리자 대시보드를 불러오는 중...</p>
         </div>
       </div>
     )
@@ -184,28 +242,32 @@ export default function AdminDashboard() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold flex items-center gap-3">
           <Settings className="h-8 w-8 text-blue-600" />
-          Admin Dashboard
+          관리자 대시보드
         </h1>
-        <p className="text-muted-foreground mt-2">Manage users, questions, and monitor system performance</p>
+        <p className="text-muted-foreground mt-2">사용자, 문제 관리 및 시스템 현황을 모니터링하세요</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Overview
+            전체 현황
           </TabsTrigger>
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            Users
+            사용자 관리
           </TabsTrigger>
           <TabsTrigger value="questions" className="flex items-center gap-2">
             <BookOpen className="h-4 w-4" />
-            Questions
+            문제 관리
           </TabsTrigger>
           <TabsTrigger value="generate" className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
-            Generate
+            문제 일괄 생성
+          </TabsTrigger>
+          <TabsTrigger value="models" className="flex items-center gap-2">
+            <Cpu className="h-4 w-4" />
+            AI 모델 설정
           </TabsTrigger>
         </TabsList>
 
@@ -220,7 +282,7 @@ export default function AdminDashboard() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-gray-900">{stats?.totalUsers || 0}</p>
-                    <p className="text-sm text-gray-600">Total Users</p>
+                    <p className="text-sm text-gray-600">전체 사용자</p>
                   </div>
                 </div>
               </CardContent>
@@ -233,7 +295,7 @@ export default function AdminDashboard() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-gray-900">{stats?.totalQuestions || 0}</p>
-                    <p className="text-sm text-gray-600">Total Questions</p>
+                    <p className="text-sm text-gray-600">전체 문제</p>
                   </div>
                 </div>
               </CardContent>
@@ -246,7 +308,7 @@ export default function AdminDashboard() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-gray-900">{stats?.totalSessions || 0}</p>
-                    <p className="text-sm text-gray-600">Quiz Sessions</p>
+                    <p className="text-sm text-gray-600">퀴즈 세션</p>
                   </div>
                 </div>
               </CardContent>
@@ -259,7 +321,7 @@ export default function AdminDashboard() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-gray-900">{stats?.recentActivity?.length || 0}</p>
-                    <p className="text-sm text-gray-600">Recent Activity</p>
+                    <p className="text-sm text-gray-600">최근 활동</p>
                   </div>
                 </div>
               </CardContent>
@@ -269,15 +331,15 @@ export default function AdminDashboard() {
           {/* Questions by Grammar Type */}
           <Card>
             <CardHeader>
-              <CardTitle>Questions by Grammar Type</CardTitle>
-              <CardDescription>Distribution of questions across different grammar topics</CardDescription>
+              <CardTitle>문법유형별 문제 수</CardTitle>
+              <CardDescription>문법유형별 문제 분포</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {Object.entries(stats?.grammarTypeStats || {}).map(([type, count]) => (
                   <div key={type} className="text-center p-4 bg-gray-50 rounded-lg">
                     <p className="text-2xl font-bold text-blue-600">{count}</p>
-                    <p className="text-sm text-gray-600">{type}</p>
+                    <p className="text-sm text-gray-600">{getKoreanGrammarType(type)}</p>
                   </div>
                 ))}
               </div>
@@ -287,8 +349,8 @@ export default function AdminDashboard() {
           {/* Recent Activity */}
           <Card>
             <CardHeader>
-              <CardTitle>Recent Quiz Activity</CardTitle>
-              <CardDescription>Latest quiz sessions from users</CardDescription>
+              <CardTitle>최근 퀴즈 활동</CardTitle>
+              <CardDescription>사용자별 최근 퀴즈 세션</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -307,7 +369,7 @@ export default function AdminDashboard() {
                       <div>
                         <p className="font-medium">{activity.user_profiles.email}</p>
                         <p className="text-sm text-gray-600">
-                          {activity.grammar_type} • {activity.difficulty_level}
+                          {getKoreanGrammarType(activity.grammar_type)} • {getKoreanDifficulty(activity.difficulty_level)}
                         </p>
                       </div>
                     </div>
@@ -338,8 +400,8 @@ export default function AdminDashboard() {
         <TabsContent value="users" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>User Management</CardTitle>
-              <CardDescription>View and manage registered users</CardDescription>
+              <CardTitle>사용자 관리</CardTitle>
+              <CardDescription>등록된 사용자를 확인하고 관리하세요</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -351,16 +413,16 @@ export default function AdminDashboard() {
                       </div>
                       <div>
                         <p className="font-medium">{user.email}</p>
-                        <p className="text-sm text-gray-600">Joined {new Date(user.created_at).toLocaleDateString()}</p>
+                        <p className="text-sm text-gray-600">가입일: {new Date(user.created_at).toLocaleDateString()}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <p className="font-medium">{user.totalSessions} quizzes</p>
-                        <p className="text-sm text-gray-600">{user.averageScore}% avg score</p>
+                        <p className="font-medium">{user.totalSessions}회 퀴즈</p>
+                        <p className="text-sm text-gray-600">평균 점수 {user.averageScore}%</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-gray-600">Last active</p>
+                        <p className="text-sm text-gray-600">최근 활동</p>
                         <p className="text-sm font-medium">{new Date(user.lastActivity).toLocaleDateString()}</p>
                       </div>
                     </div>
@@ -374,8 +436,35 @@ export default function AdminDashboard() {
         <TabsContent value="questions" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Question Management</CardTitle>
-              <CardDescription>View, filter, and manage grammar questions</CardDescription>
+              <CardTitle>문제 관리</CardTitle>
+              <CardDescription>문법 문제를 확인, 필터, 관리하세요</CardDescription>
+              <div className="mt-4 flex justify-end">
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    if (!confirm("정말 모든 문제를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) return;
+                    try {
+                      const response = await fetch("/api/admin/questions", {
+                        method: "DELETE",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ deleteAll: true }),
+                      });
+                      if (response.ok) {
+                        toast({ title: "성공", description: "모든 문제가 삭제되었습니다." });
+                        fetchQuestions();
+                        fetchStats();
+                      } else {
+                        throw new Error("전체 삭제 실패");
+                      }
+                    } catch (error) {
+                      toast({ title: "오류", description: "전체 문제 삭제에 실패했습니다.", variant: "destructive" });
+                    }
+                  }}
+                  className="ml-auto"
+                >
+                  전체 문제 삭제
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Filters */}
@@ -385,13 +474,13 @@ export default function AdminDashboard() {
                   onValueChange={(value) => setQuestionsFilter((prev) => ({ ...prev, grammarType: value }))}
                 >
                   <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Filter by grammar type" />
+                    <SelectValue placeholder="문법유형별 필터" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Grammar Types</SelectItem>
+                    <SelectItem value="all">전체 문법유형</SelectItem>
                     {Object.keys(stats?.grammarTypeStats || {}).map((type) => (
                       <SelectItem key={type} value={type}>
-                        {type}
+                        {getKoreanGrammarType(type)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -401,13 +490,13 @@ export default function AdminDashboard() {
                   onValueChange={(value) => setQuestionsFilter((prev) => ({ ...prev, difficultyLevel: value }))}
                 >
                   <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Filter by difficulty" />
+                    <SelectValue placeholder="난이도별 필터" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Difficulties</SelectItem>
-                    <SelectItem value="beginner">Beginner</SelectItem>
-                    <SelectItem value="intermediate">Intermediate</SelectItem>
-                    <SelectItem value="advanced">Advanced</SelectItem>
+                    <SelectItem value="all">전체 난이도</SelectItem>
+                    <SelectItem value="beginner">초급</SelectItem>
+                    <SelectItem value="intermediate">중급</SelectItem>
+                    <SelectItem value="advanced">고급</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -422,7 +511,7 @@ export default function AdminDashboard() {
                           <p className="font-medium text-lg">{question.question_text}</p>
                           <div className="flex items-center gap-2">
                             <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                              {question.grammar_type}
+                              {getKoreanGrammarType(question.grammar_type)}
                             </Badge>
                             <Badge
                               variant="secondary"
@@ -434,15 +523,25 @@ export default function AdminDashboard() {
                                     : "bg-red-100 text-red-800"
                               }`}
                             >
-                              {question.difficulty_level}
+                              {getKoreanDifficulty(question.difficulty_level)}
                             </Badge>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteQuestion(question.id)}
-                              className="text-red-600 hover:text-red-700"
+                              disabled={deletingQuestions.has(question.id)}
+                              onClick={() => {
+                                if (!question.id || typeof question.id !== "string" || question.id.trim() === "") {
+                                  toast({ title: "오류", description: "유효하지 않은 문제 ID입니다.", variant: "destructive" });
+                                  return;
+                                }
+                                handleDeleteQuestion(question.id)
+                              }}
+                              className="text-red-600 hover:text-red-700 disabled:opacity-50"
                             >
                               <Trash2 className="h-4 w-4" />
+                              {deletingQuestions.has(question.id) && (
+                                <span className="ml-1 text-xs">삭제중...</span>
+                              )}
                             </Button>
                           </div>
                         </div>
@@ -478,7 +577,7 @@ export default function AdminDashboard() {
                         </div>
                         <div className="bg-blue-50 p-3 rounded text-sm">
                           <p>
-                            <strong>Explanation:</strong> {question.explanation}
+                            <strong>해설:</strong> {question.explanation}
                           </p>
                         </div>
                       </div>
@@ -495,17 +594,17 @@ export default function AdminDashboard() {
                     onClick={() => setQuestionsPage((prev) => Math.max(1, prev - 1))}
                     disabled={questionsPage === 1}
                   >
-                    Previous
+                    이전
                   </Button>
                   <span className="flex items-center px-4">
-                    Page {questionsPage} of {questionsTotalPages}
+                    {questionsTotalPages}페이지 중 {questionsPage}페이지
                   </span>
                   <Button
                     variant="outline"
                     onClick={() => setQuestionsPage((prev) => Math.min(questionsTotalPages, prev + 1))}
                     disabled={questionsPage === questionsTotalPages}
                   >
-                    Next
+                    다음
                   </Button>
                 </div>
               )}
@@ -515,6 +614,36 @@ export default function AdminDashboard() {
 
         <TabsContent value="generate">
           <QuestionGenerator />
+        </TabsContent>
+
+        <TabsContent value="models" className="space-y-6">
+          <div className="grid gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Cpu className="h-5 w-5" />
+                  AI 모델 설정
+                </CardTitle>
+                <CardDescription>
+                  문제 생성에 사용할 AI 모델을 설정하고 관리합니다.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid gap-4">
+                    <div className="p-4 border rounded-lg">
+                      <h3 className="font-medium mb-2">현재 AI Provider</h3>
+                      <Badge variant="outline">
+                        {process.env.AI_PROVIDER || 'gemini'}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <LMStudioModelSelector />
+          </div>
         </TabsContent>
       </Tabs>
     </div>

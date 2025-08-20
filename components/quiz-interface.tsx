@@ -29,15 +29,25 @@ interface User {
 interface QuizInterfaceProps {
   grammarType: string
   difficulty: string
+  questionCount?: number
+  scoringMode?: "end" | "immediate"
   onComplete: () => void
   user: User
 }
 
-export default function QuizInterface({ grammarType, difficulty, onComplete, user }: QuizInterfaceProps) {
+export default function QuizInterface({ 
+  grammarType, 
+  difficulty, 
+  questionCount = 10,
+  scoringMode = "end",
+  onComplete, 
+  user 
+}: QuizInterfaceProps) {
   const [questions, setQuestions] = useState<Question[]>([])
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({})
   const [showResults, setShowResults] = useState(false)
+  const [showQuestionResult, setShowQuestionResult] = useState<Record<number, boolean>>({}) // 즉시 채점 모드용
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const { toast } = useToast()
@@ -48,28 +58,34 @@ export default function QuizInterface({ grammarType, difficulty, onComplete, use
 
   const fetchQuestions = async () => {
     try {
+      console.log('🔍 Fetching questions for:', { grammarType, difficulty, questionCount })
+      
       const response = await fetch(
-        `/api/questions?grammarType=${encodeURIComponent(grammarType)}&difficultyLevel=${difficulty}&limit=10`,
+        `/api/questions?grammarType=${encodeURIComponent(grammarType)}&difficultyLevel=${difficulty}&limit=${questionCount}`,
       )
       const data = await response.json()
+
+      console.log('📝 Questions response:', data)
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to fetch questions")
       }
 
       if (data.questions.length === 0) {
+        console.log('⚠️ No questions found')
         toast({
-          title: "No Questions Available",
-          description: "No questions found for this topic and difficulty. Please try another combination.",
+          title: "사용 가능한 문제가 없습니다",
+          description: "이 문법유형과 난이도에 해당하는 문제가 없습니다. 다른 조합을 시도해보세요.",
           variant: "destructive",
         })
         onComplete()
         return
       }
 
+      console.log(`✅ Loaded ${data.questions.length} questions`)
       setQuestions(data.questions)
     } catch (error) {
-      console.error("Error fetching questions:", error)
+      console.error("❌ Error fetching questions:", error)
       toast({
         title: "Error",
         description: "Failed to load questions. Please try again.",
@@ -86,6 +102,14 @@ export default function QuizInterface({ grammarType, difficulty, onComplete, use
       ...prev,
       [currentQuestionIndex]: answer,
     }))
+
+    // 즉시 채점 모드인 경우
+    if (scoringMode === "immediate") {
+      setShowQuestionResult((prev) => ({
+        ...prev,
+        [currentQuestionIndex]: true,
+      }))
+    }
   }
 
   const handleNext = () => {
@@ -158,6 +182,7 @@ export default function QuizInterface({ grammarType, difficulty, onComplete, use
   const handleRetakeQuiz = () => {
     setCurrentQuestionIndex(0)
     setSelectedAnswers({})
+    setShowQuestionResult({})
     setShowResults(false)
   }
 
@@ -320,21 +345,62 @@ export default function QuizInterface({ grammarType, difficulty, onComplete, use
               {["A", "B", "C", "D"].map((option) => {
                 const optionText = currentQuestion[`option_${option.toLowerCase()}` as keyof Question] as string
                 const isSelected = selectedAnswers[currentQuestionIndex] === option
+                const showResult = showQuestionResult[currentQuestionIndex]
+                const isCorrect = currentQuestion.correct_answer === option
+                const isUserAnswer = isSelected
+                
+                let buttonClass = "p-4 text-left rounded-lg border-2 transition-all "
+                
+                if (showResult && scoringMode === "immediate") {
+                  if (isCorrect) {
+                    // 정답은 초록색
+                    buttonClass += "border-green-500 bg-green-50 text-green-800"
+                  } else if (isUserAnswer && !isCorrect) {
+                    // 사용자가 선택한 오답은 빨간색
+                    buttonClass += "border-red-500 bg-red-50 text-red-800"
+                  } else {
+                    // 그 외는 회색
+                    buttonClass += "border-gray-200 bg-gray-50 text-gray-600"
+                  }
+                } else {
+                  // 일반 상태
+                  if (isSelected) {
+                    buttonClass += "border-blue-500 bg-blue-50"
+                  } else {
+                    buttonClass += "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                  }
+                }
+
                 return (
                   <button
                     key={option}
-                    onClick={() => handleAnswerSelect(option)}
-                    className={`p-4 text-left rounded-lg border-2 transition-all ${
-                      isSelected
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                    }`}
+                    onClick={() => !showResult && handleAnswerSelect(option)}
+                    disabled={showResult && scoringMode === "immediate"}
+                    className={buttonClass}
                   >
-                    <span className="font-medium text-blue-600">{option})</span> {optionText}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-medium text-blue-600">{option})</span> {optionText}
+                      </div>
+                      {showResult && scoringMode === "immediate" && isCorrect && (
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                      )}
+                      {showResult && scoringMode === "immediate" && isUserAnswer && !isCorrect && (
+                        <XCircle className="h-5 w-5 text-red-600" />
+                      )}
+                    </div>
                   </button>
                 )
               })}
             </div>
+
+            {/* 즉시 채점 모드에서 답변 후 해설 표시 */}
+            {showQuestionResult[currentQuestionIndex] && scoringMode === "immediate" && (
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
+                <h4 className="font-semibold text-gray-900 mb-2">해설</h4>
+                <p className="text-gray-700">{currentQuestion.explanation}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

@@ -21,10 +21,10 @@ function SubmitButton() {
       {pending ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Creating account...
+          계정 생성 중...
         </>
       ) : (
-        "Create Account"
+        "회원가입"
       )}
     </Button>
   )
@@ -39,8 +39,8 @@ export default function SignUpForm() {
         <div className="mx-auto w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
           <BookOpen className="h-6 w-6 text-white" />
         </div>
-        <CardTitle className="text-2xl font-bold text-gray-900">Create Account</CardTitle>
-        <CardDescription className="text-gray-600">Start your English grammar learning journey</CardDescription>
+        <CardTitle className="text-2xl font-bold text-gray-900">회원가입</CardTitle>
+        <CardDescription className="text-gray-600">이메일과 비밀번호로 계정을 만들어주세요</CardDescription>
       </CardHeader>
       <CardContent>
         <form action={formAction} className="space-y-6">
@@ -59,13 +59,13 @@ export default function SignUpForm() {
           <div className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email Address
+                이메일
               </label>
               <Input id="email" name="email" type="email" placeholder="you@example.com" required className="h-12" />
             </div>
             <div className="space-y-2">
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
+                비밀번호
               </label>
               <Input id="password" name="password" type="password" required className="h-12" />
             </div>
@@ -74,9 +74,9 @@ export default function SignUpForm() {
           <SubmitButton />
 
           <div className="text-center text-gray-600">
-            Already have an account?{" "}
+            이미 계정이 있으신가요?{" "}
             <Link href="/auth/login" className="text-blue-600 hover:text-blue-700 font-medium">
-              Sign in
+              로그인
             </Link>
           </div>
         </form>
