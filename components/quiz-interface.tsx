@@ -33,6 +33,7 @@ interface QuizInterfaceProps {
   scoringMode?: "end" | "immediate"
   onComplete: () => void
   user: User
+  isWeaknessQuiz?: boolean
 }
 
 export default function QuizInterface({ 
@@ -41,7 +42,8 @@ export default function QuizInterface({
   questionCount = 10,
   scoringMode = "end",
   onComplete, 
-  user 
+  user,
+  isWeaknessQuiz = false
 }: QuizInterfaceProps) {
   const [questions, setQuestions] = useState<Question[]>([])
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
@@ -50,6 +52,8 @@ export default function QuizInterface({
   const [showQuestionResult, setShowQuestionResult] = useState<Record<number, boolean>>({}) // 즉시 채점 모드용
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [noQuestionsFound, setNoQuestionsFound] = useState(false)
+  const [noQuestionsMessage, setNoQuestionsMessage] = useState("")
   const { toast } = useToast()
 
   useEffect(() => {
@@ -58,37 +62,71 @@ export default function QuizInterface({
 
   const fetchQuestions = async () => {
     try {
-      console.log('🔍 Fetching questions for:', { grammarType, difficulty, questionCount })
+      console.log('🔍 Fetching questions for:', { grammarType, difficulty, questionCount, isWeaknessQuiz })
       
-      const response = await fetch(
-        `/api/questions?grammarType=${encodeURIComponent(grammarType)}&difficultyLevel=${difficulty}&limit=${questionCount}`,
-      )
-      const data = await response.json()
+      let url: string
+      if (isWeaknessQuiz) {
+        // 취약 유형 퀴즈: 틀린 문제만 가져오기
+        console.log('🎯 Weakness quiz mode - fetching incorrect questions only')
+        url = `/api/questions/incorrect?grammarType=${encodeURIComponent(grammarType)}&limit=${questionCount}&userId=${user.id}`
+      } else {
+        // 일반 퀴즈: 기존 방식
+        url = `/api/questions?grammarType=${encodeURIComponent(grammarType)}&difficultyLevel=${difficulty}&limit=${questionCount}`
+      }
+      
+      console.log('🌐 Making request to URL:', url)
+      const response = await fetch(url)
+      
+      console.log('📨 Response received:', {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      })
 
+      const data = await response.json()
       console.log('📝 Questions response:', data)
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to fetch questions")
+        console.error('❌ API Error:', data)
+        const errorMessage = data.error || data.message || "Failed to fetch questions"
+        throw new Error(errorMessage)
       }
 
-      if (data.questions.length === 0) {
+      if (data.questions?.length === 0 || data.total === 0) {
         console.log('⚠️ No questions found')
-        toast({
-          title: "사용 가능한 문제가 없습니다",
-          description: "이 문법유형과 난이도에 해당하는 문제가 없습니다. 다른 조합을 시도해보세요.",
-          variant: "destructive",
-        })
-        onComplete()
-        return
+        const message = isWeaknessQuiz 
+          ? data.message || "이 문법유형에서 틀린 문제가 없습니다. 새로운 문제를 풀어보세요!"
+          : "이 문법유형과 난이도에 해당하는 문제가 없습니다. 다른 조합을 시도해보세요."
+        
+        if (isWeaknessQuiz) {
+          // 취약 문제가 없는 경우: 축하 화면 표시
+          setNoQuestionsFound(true)
+          setNoQuestionsMessage(message)
+          setIsLoading(false)
+          return
+        } else {
+          // 일반 퀴즈에서 문제가 없는 경우: 즉시 돌아가기
+          toast({
+            title: "사용 가능한 문제가 없습니다",
+            description: message,
+            variant: "destructive",
+          })
+          onComplete()
+          return
+        }
       }
 
       console.log(`✅ Loaded ${data.questions.length} questions`)
       setQuestions(data.questions)
     } catch (error) {
       console.error("❌ Error fetching questions:", error)
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
+      console.error("❌ Detailed error:", errorMessage)
+      
       toast({
         title: "Error",
-        description: "Failed to load questions. Please try again.",
+        description: `Failed to load questions: ${errorMessage}`,
         variant: "destructive",
       })
       onComplete()
@@ -149,8 +187,10 @@ export default function QuizInterface({
       }
 
       toast({
-        title: "Quiz Completed!",
-        description: `Your results have been saved. Score: ${score.percentage}%`,
+        title: isWeaknessQuiz ? "틀린 문제 복습 완료!" : "Quiz Completed!",
+        description: isWeaknessQuiz 
+          ? `틀린 문제들을 다시 풀어보셨습니다. 점수: ${score.percentage}%`
+          : `Your results have been saved. Score: ${score.percentage}%`,
       })
     } catch (error) {
       console.error("Error saving quiz results:", error)
@@ -184,6 +224,40 @@ export default function QuizInterface({
     setSelectedAnswers({})
     setShowQuestionResult({})
     setShowResults(false)
+  }
+
+  // 취약 문제가 없는 경우 축하 화면
+  if (noQuestionsFound) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-xl">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-6">
+              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle className="h-10 w-10 text-green-600" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold text-green-800">축하합니다! 🎉</h2>
+                <p className="text-green-700 leading-relaxed">
+                  {noQuestionsMessage}
+                </p>
+              </div>
+              <div className="space-y-3">
+                <p className="text-sm text-green-600">
+                  이 문법 유형을 완전히 마스터하셨습니다!
+                </p>
+                <Button 
+                  onClick={onComplete}
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  성취도 분석으로 돌아가기
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   if (isLoading) {
@@ -316,12 +390,19 @@ export default function QuizInterface({
               Back to Dashboard
             </Button>
             <div className="flex items-center gap-2">
+              {isWeaknessQuiz && (
+                <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                  틀린 문제 복습
+                </Badge>
+              )}
               <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                 {grammarType}
               </Badge>
-              <Badge variant="secondary" className="bg-green-100 text-green-800 capitalize">
-                {difficulty}
-              </Badge>
+              {!isWeaknessQuiz && (
+                <Badge variant="secondary" className="bg-green-100 text-green-800 capitalize">
+                  {difficulty}
+                </Badge>
+              )}
             </div>
           </div>
           <div className="space-y-2">

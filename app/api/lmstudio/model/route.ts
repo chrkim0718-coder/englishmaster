@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
       defaultModel: defaultModel,
       selectedModel: selectedModel,
       currentModel: data.data?.[0]?.id || 'none',
+      localServer: apiBase, // Add the base URL for connection testing
       availableModels: data.data?.map((model: any) => ({
         id: model.id,
         created: model.created,

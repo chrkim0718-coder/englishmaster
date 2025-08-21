@@ -71,6 +71,34 @@ export async function GET(request: NextRequest) {
         return acc
       }, {}) || {}
 
+    // Get questions by grammar type and difficulty for detailed breakdown
+    const { data: questionsDetailed, error: detailedError } = await supabase
+      .from("grammar_questions")
+      .select("grammar_type, difficulty_level")
+
+    const grammarTypeDetailedStats: any = {}
+    if (questionsDetailed) {
+      questionsDetailed.forEach((q) => {
+        if (!grammarTypeDetailedStats[q.grammar_type]) {
+          grammarTypeDetailedStats[q.grammar_type] = {
+            total: 0,
+            beginner: 0,
+            intermediate: 0,
+            advanced: 0
+          }
+        }
+        grammarTypeDetailedStats[q.grammar_type].total++
+        
+        if (q.difficulty_level === 'beginner') {
+          grammarTypeDetailedStats[q.grammar_type].beginner++
+        } else if (q.difficulty_level === 'intermediate') {
+          grammarTypeDetailedStats[q.grammar_type].intermediate++
+        } else if (q.difficulty_level === 'advanced') {
+          grammarTypeDetailedStats[q.grammar_type].advanced++
+        }
+      })
+    }
+
     // Get questions by difficulty
     const { data: questionsByDifficulty, error: difficultyError } = await supabase
       .from("grammar_questions")
@@ -99,6 +127,7 @@ export async function GET(request: NextRequest) {
         totalQuestions: totalQuestions || 0,
         totalSessions: totalSessions || 0,
         grammarTypeStats,
+        grammarTypeDetailedStats,
         difficultyStats,
         recentActivity: recentActivity || [],
       },

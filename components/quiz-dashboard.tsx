@@ -28,6 +28,8 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [isQuizActive, setIsQuizActive] = useState(false)
   const [showPerformance, setShowPerformance] = useState(false)
+  const [isWeaknessQuiz, setIsWeaknessQuiz] = useState(false)
+  const [performanceRefreshTrigger, setPerformanceRefreshTrigger] = useState(0)
   const [stats, setStats] = useState({
     totalQuizzes: 0,
     averageScore: 0,
@@ -182,6 +184,25 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
 
   const handleQuizComplete = () => {
     setIsQuizActive(false)
+    
+    // 취약 문제 퀴즈였다면 Performance Dashboard로 돌아가기
+    if (isWeaknessQuiz) {
+      setIsWeaknessQuiz(false)
+      setShowPerformance(true)
+      setSelectedGrammarType("")
+      setSelectedDifficulty("")
+      setSelectedQuestionCount("")
+      setSelectedScoringMode("end")
+      setAvailableQuestionCount(0)
+      // Performance Dashboard 새로고침 트리거
+      setPerformanceRefreshTrigger(prev => prev + 1)
+      // Refresh stats after quiz completion
+      fetchStats()
+      return
+    }
+    
+    // 일반 퀴즈 완료 후 초기 설정
+    setIsWeaknessQuiz(false)
     setSelectedGrammarType("")
     setSelectedDifficulty("")
     setSelectedQuestionCount("")
@@ -191,8 +212,25 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
     fetchStats()
   }
 
+  const handleStartWeaknessQuiz = (grammarType: string) => {
+    console.log('🎯 Starting weakness quiz for:', grammarType)
+    
+    setSelectedGrammarType(grammarType)
+    setSelectedDifficulty("") // 난이도는 혼합
+    setSelectedQuestionCount("10") // 기본 10문제
+    setSelectedScoringMode("immediate") // 즉시 채점으로 설정
+    setIsWeaknessQuiz(true)
+    setIsQuizActive(true)
+    setShowPerformance(false)
+  }
+
   if (showPerformance) {
-    return <PerformanceDashboard onBack={() => setShowPerformance(false)} />
+    return <PerformanceDashboard 
+      onBack={() => setShowPerformance(false)} 
+      onStartWeaknessQuiz={handleStartWeaknessQuiz}
+      onRefresh={() => setPerformanceRefreshTrigger(prev => prev + 1)}
+      key={performanceRefreshTrigger} // key를 변경하여 컴포넌트 재마운트
+    />
   }
 
   if (isQuizActive) {
@@ -204,6 +242,7 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
         scoringMode={selectedScoringMode as "end" | "immediate"}
         onComplete={handleQuizComplete}
         user={user}
+        isWeaknessQuiz={isWeaknessQuiz}
       />
     )
   }

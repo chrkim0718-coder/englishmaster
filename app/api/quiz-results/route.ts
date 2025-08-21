@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createApiClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,6 +14,18 @@ export async function POST(request: NextRequest) {
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    // Create service role client for user_answers operations
+    const serviceSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
 
     // Ensure user profile exists
     const { error: profileError } = await supabase
@@ -46,15 +59,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to save quiz results" }, { status: 500 })
     }
 
-    // Save individual question results
-    if (sessionData && sessionData[0]) {
-      const questionResults = questions.map((question: any, index: number) => ({
-        session_id: sessionData[0].id,
+    // Save individual question results to user_answers table
+    // Handle both array and object format for answers
+    const userAnswers = questions.map((question: any, index: number) => {
+      const selectedAnswer = Array.isArray(answers) ? answers[index] : answers[index.toString()]
+      return {
+        user_id: user.id,
         question_id: question.id,
-        user_answer: answers[index],
-        is_correct: answers[index] === question.correct_answer,
-        question_data: question,
-      }))
+        selected_answer: selectedAnswer,
+        is_correct: selectedAnswer === question.correct_answer,
+      }
+    })
+
+    console.log("💾 Saving user answers:", userAnswers)
+
+    // Use service role client to bypass RLS for user_answers
+    const { error: answersError } = await serviceSupabase
+      .from("user_answers")
+      .upsert(userAnswers, { 
+        onConflict: "user_id,question_id",
+        ignoreDuplicates: false 
+      })
+
+    if (answersError) {
+      console.error("User answers save error:", answersError)
+      // Don't fail the request if user answers fail to save
+    } else {
+      console.log("✅ User answers saved successfully")
+    }
+
+    // Also save to quiz_question_results if it exists
+    if (sessionData && sessionData[0]) {
+      const questionResults = questions.map((question: any, index: number) => {
+        const selectedAnswer = Array.isArray(answers) ? answers[index] : answers[index.toString()]
+        return {
+          session_id: sessionData[0].id,
+          question_id: question.id,
+          user_answer: selectedAnswer,
+          is_correct: selectedAnswer === question.correct_answer,
+          question_data: question,
+        }
+      })
 
       const { error: resultsError } = await supabase
         .from("quiz_question_results")
