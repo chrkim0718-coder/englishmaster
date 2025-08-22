@@ -70,6 +70,41 @@ interface ValidationSummary {
 }
 
 export default function AdminDashboard() {
+  // 문제 데이터 이슈별 조치 핸들러들
+  async function handleAutoFillQuestion(id: string) {
+    // 예시: 모든 빈 옵션을 'N/A'로 채움
+    await fetch(`/api/admin/questions/${id}/autofill`, { method: 'POST' });
+    toast({ title: '자동채움 완료', description: '누락된 필드가 자동으로 채워졌습니다.' });
+    fetchQuestions();
+  }
+
+  async function handleFixGrammarType(id: string, grammarType: string) {
+    await fetch(`/api/admin/questions/${id}/grammar-type`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ grammar_type: grammarType })
+    });
+    toast({ title: '문법유형 수정 완료' });
+    fetchQuestions();
+  }
+
+  async function handleFixExplanation(id: string, explanation: string) {
+    await fetch(`/api/admin/questions/${id}/explanation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ explanation })
+    });
+    toast({ title: '설명 수정 완료' });
+    fetchQuestions();
+  }
+
+  async function handleAutoFillOptions(id: string) {
+    await fetch(`/api/admin/questions/${id}/autofill-options`, { method: 'POST' });
+    toast({ title: '옵션 자동채움 완료' });
+    fetchQuestions();
+  }
+
+  // ...기존 코드 삭제 (중복 함수 제거)...
   const [activeTab, setActiveTab] = useState("overview")
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [users, setUsers] = useState<User[]>([])
@@ -77,8 +112,8 @@ export default function AdminDashboard() {
   const [questionsPage, setQuestionsPage] = useState(1)
   const [questionsTotalPages, setQuestionsTotalPages] = useState(1)
   const [questionsFilter, setQuestionsFilter] = useState({
-    grammarType: "all",
-    difficultyLevel: "all",
+    grammarType: "all", // 빈 문자열이 아닌 값으로 초기화
+    difficultyLevel: "all", // 빈 문자열이 아닌 값으로 초기화
     search: "",
   })
   const [isLoading, setIsLoading] = useState(true)
@@ -99,7 +134,42 @@ export default function AdminDashboard() {
     beginner: number;
     intermediate: number;
     advanced: number;
-  }>>({})
+  }>>({});
+
+  // 임시 비밀번호 상태 및 전송 핸들러
+  const [tempPassword, setTempPassword] = useState("");
+  const [isSendingTempPassword, setIsSendingTempPassword] = useState(false);
+
+  function generateRandomPassword(length = 8) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
+  async function handleSendTempPassword(email: string) {
+    if (!email) return;
+    const randomPassword = generateRandomPassword(8);
+    setIsSendingTempPassword(true);
+    try {
+      const res = await fetch("/api/admin/send-temp-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, tempPassword: randomPassword }),
+      });
+      if (res.ok) {
+        toast({ title: "성공", description: `임시 비밀번호 메일이 전송되었습니다. (${randomPassword})` });
+      } else {
+        toast({ title: "오류", description: "메일 전송에 실패했습니다.", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "오류", description: "메일 전송 중 오류가 발생했습니다.", variant: "destructive" });
+    } finally {
+      setIsSendingTempPassword(false);
+    }
+  }
 
   // User management states
   const [showCreateUserForm, setShowCreateUserForm] = useState(false)
@@ -1253,7 +1323,7 @@ export default function AdminDashboard() {
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {Object.entries(stats?.grammarTypeStats || {}).map(([type, count]) => {
-                  const details = stats?.grammarTypeDetailedStats?.[type]
+                  const details = stats?.grammarTypeStats?.[type]
                   return (
                     <div key={type} className="text-center p-4 bg-gray-50 rounded-lg">
                       <p className="text-2xl font-bold text-blue-600">{count}</p>
@@ -1481,13 +1551,22 @@ export default function AdminDashboard() {
                             <Trash2 className="h-4 w-4" />
                             {isDeletingUser.has(user.id) ? "삭제 중..." : "삭제"}
                           </Button>
+
+                          {/* 임시비밀번호 보내기 버튼 */}
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setShowPasswordReset(user.id)}
+                          >
+                            임시비밀번호 보내기
+                          </Button>
                         </div>
                       </div>
                     </div>
                     
-                    {/* Password Reset Form */}
+                    {/* Password Reset & Temp Password Form */}
                     {showPasswordReset === user.id && (
-                      <div className="mt-4 p-4 bg-gray-50 border rounded-lg">
+                      <div className="mt-4 p-4 bg-gray-50 border rounded-lg space-y-4">
                         <h4 className="font-medium text-gray-800 mb-3">
                           {user.email}의 비밀번호 재설정
                         </h4>
@@ -1504,6 +1583,7 @@ export default function AdminDashboard() {
                             onClick={() => {
                               setShowPasswordReset(null)
                               setResetPassword('')
+                              setTempPassword('')
                             }}
                           >
                             취소
@@ -1515,8 +1595,25 @@ export default function AdminDashboard() {
                             {isResettingPassword ? "재설정 중..." : "재설정"}
                           </Button>
                         </div>
+                        <div className="flex gap-2 items-center">
+                          <Input
+                            type="text"
+                            placeholder="임시 비밀번호 입력"
+                            value={tempPassword}
+                            onChange={(e) => setTempPassword(e.target.value)}
+                            className="flex-1"
+                          />
+                          <Button
+                            onClick={() => handleSendTempPassword(user.email)}
+                            disabled={!tempPassword || isSendingTempPassword}
+                            variant="secondary"
+                          >
+                            {isSendingTempPassword ? "전송 중..." : "임시 비밀번호 메일 전송"}
+                          </Button>
+                        </div>
                       </div>
                     )}
+
                   </div>
                 ))}
               </div>
@@ -1599,6 +1696,65 @@ export default function AdminDashboard() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* 문제 검증 결과 이슈별 조치 UI */}
+                  {validationResults && validationResults.length > 0 && (
+                    <Card className="bg-red-50 border-red-200">
+                      <CardHeader>
+                        <CardTitle className="text-lg">문제 데이터 이슈별 조치</CardTitle>
+                        <CardDescription>아래 이슈별로 직접 수정/삭제/자동채움이 가능합니다.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {validationResults.map((issue, idx) => (
+                          <div key={issue.id || idx} className="p-3 bg-white rounded-lg border mb-2">
+                            <div className="mb-1 text-sm text-gray-700">
+                              <b>문제:</b> {issue.question_text || issue.message}
+                            </div>
+                            <div className="mb-2 text-xs text-gray-500">{issue.category} / {issue.severity}</div>
+                            {/* 누락 필드 자동채움 */}
+                            {issue.category === 'Data Integrity' && (
+                              <Button size="sm" variant="outline" onClick={() => handleAutoFillQuestion(issue.id)}>
+                                자동채움
+                              </Button>
+                            )}
+                            {/* 문법유형 오류/미지정 */}
+                            {issue.category === 'Grammar Type Validation' && (
+                              <div className="flex gap-2 items-center">
+                                <select value={issue.grammar_type || ''} onChange={e => handleFixGrammarType(issue.id, e.target.value)} className="border rounded px-2 py-1">
+                                  <option value="">문법유형 선택</option>
+                                  {Object.keys(REVERSE_GRAMMAR_TYPE_MAPPING).map(type => (
+                                    <option key={type} value={type}>{getKoreanGrammarType(type)}</option>
+                                  ))}
+                                </select>
+                                <Button size="sm" onClick={() => handleFixGrammarType(issue.id, issue.grammar_type)}>
+                                  수정
+                                </Button>
+                              </div>
+                            )}
+                            {/* 설명 너무 짧음 */}
+                            {issue.category === 'Explanation Quality' && (
+                              <div className="flex gap-2 items-center">
+                                <input type="text" className="border rounded px-2 py-1 flex-1" value={issue.explanation || ''} onChange={e => handleFixExplanation(issue.id, e.target.value)} />
+                                <Button size="sm" onClick={() => handleFixExplanation(issue.id, issue.explanation)}>
+                                  설명 수정
+                                </Button>
+                              </div>
+                            )}
+                            {/* 옵션 중복/누락 자동채움 */}
+                            {issue.category === 'Option Validation' && (
+                              <Button size="sm" variant="outline" onClick={() => handleAutoFillOptions(issue.id)}>
+                                옵션 자동채움
+                              </Button>
+                            )}
+                            {/* 즉시 삭제 */}
+                            <Button size="sm" variant="destructive" className="ml-2" onClick={() => handleDeleteQuestion(issue.id)}>
+                              삭제
+                            </Button>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* Data Fix Actions */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1700,19 +1856,21 @@ export default function AdminDashboard() {
               {/* Filters */}
               <div className="flex gap-4">
                 <Select
-                  value={questionsFilter.grammarType}
-                  onValueChange={(value) => setQuestionsFilter((prev) => ({ ...prev, grammarType: value }))}
+                  value={questionsFilter.grammarType || "all"}
+                  onValueChange={(value) => setQuestionsFilter((prev) => ({ ...prev, grammarType: value || "all" }))}
                 >
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="문법유형별 필터" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">전체 문법유형</SelectItem>
-                    {Object.keys(stats?.grammarTypeStats || {}).map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {getKoreanGrammarType(type)}
-                      </SelectItem>
-                    ))}
+                    {Object.keys(stats?.grammarTypeStats || {})
+                      .filter((type) => typeof type === "string" && type.trim() !== "")
+                      .map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {getKoreanGrammarType(type)}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
                 <Select
@@ -1974,31 +2132,33 @@ export default function AdminDashboard() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">모든 유형</SelectItem>
-                      {Object.entries(grammarTypeCounts).map(([type, count]) => {
-                        const details = grammarTypeDetails[type]
-                        return (
-                          <SelectItem key={type} value={type}>
-                            <div className="flex flex-col">
-                              <div className="font-medium">
-                                {getKoreanGrammarType(type)} ({count}개)
-                              </div>
-                              {details && (
-                                <div className="text-xs text-gray-500 flex gap-2">
-                                  <span className="bg-green-100 text-green-800 px-1 rounded">
-                                    초급 {details.beginner}
-                                  </span>
-                                  <span className="bg-yellow-100 text-yellow-800 px-1 rounded">
-                                    중급 {details.intermediate}
-                                  </span>
-                                  <span className="bg-red-100 text-red-800 px-1 rounded">
-                                    고급 {details.advanced}
-                                  </span>
+                      {Object.entries(grammarTypeCounts)
+                        .filter(([type]) => typeof type === "string" && type.trim() !== "")
+                        .map(([type, count]) => {
+                          const details = grammarTypeDetails[type]
+                          return (
+                            <SelectItem key={type} value={type}>
+                              <div className="flex flex-col">
+                                <div className="font-medium">
+                                  {getKoreanGrammarType(type)} ({count}개)
                                 </div>
-                              )}
-                            </div>
-                          </SelectItem>
-                        )
-                      })}
+                                {details && (
+                                  <div className="text-xs text-gray-500 flex gap-2">
+                                    <span className="bg-green-100 text-green-800 px-1 rounded">
+                                      초급 {details.beginner}
+                                    </span>
+                                    <span className="bg-yellow-100 text-yellow-800 px-1 rounded">
+                                      중급 {details.intermediate}
+                                    </span>
+                                    <span className="bg-red-100 text-red-800 px-1 rounded">
+                                      고급 {details.advanced}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </SelectItem>
+                          )
+                        })}
                     </SelectContent>
                   </Select>
                 </div>
@@ -2325,7 +2485,7 @@ export default function AdminDashboard() {
                                         <div>
                                           <span className="font-medium text-red-700">🚨 발견된 문제점:</span>
                                           <div className="text-red-600 ml-4">
-                                            {aiResult.issues.map((issue, index) => (
+                                            {aiResult.issues.map((issue: any, index: number) => (
                                               <div key={index}>• {issue}</div>
                                             ))}
                                           </div>
@@ -2336,7 +2496,7 @@ export default function AdminDashboard() {
                                         <div>
                                           <span className="font-medium text-blue-700">💡 개선 제안:</span>
                                           <div className="text-blue-600 ml-4">
-                                            {aiResult.suggestions.map((suggestion, index) => (
+                                            {aiResult.suggestions.map((suggestion: any, index: number) => (
                                               <div key={index}>• {suggestion}</div>
                                             ))}
                                           </div>
