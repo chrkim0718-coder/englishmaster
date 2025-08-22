@@ -17,6 +17,11 @@ interface QuizDashboardProps {
 }
 
 export default function QuizDashboard({ user }: QuizDashboardProps) {
+  // 게임모드로 시작 버튼 핸들러
+  function handleStartGameQuiz() {
+    // 게임모드 시작 로직: 예시로 alert만 표시
+    alert('게임모드로 시작! (여기에 게임모드 로직을 연결하세요)');
+  }
   const [selectedGrammarType, setSelectedGrammarType] = useState("")
   const [selectedDifficulty, setSelectedDifficulty] = useState("")
   const [selectedQuestionCount, setSelectedQuestionCount] = useState("")
@@ -494,7 +499,16 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
                 className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white text-lg font-medium"
               >
                 <Play className="h-5 w-5 mr-2" />
-                퀴즈 시작 
+                퀴즈 시작
+                {selectedQuestionCount && ` (${selectedQuestionCount}문제)`}
+              </Button>
+              <Button
+                onClick={handleStartGameQuiz}
+                disabled={!selectedGrammarType || !selectedDifficulty || !selectedQuestionCount}
+                className="w-full h-12 bg-green-600 hover:bg-green-700 text-white text-lg font-medium mt-2"
+              >
+                <Play className="h-5 w-5 mr-2" />
+                게임모드로 시작
                 {selectedQuestionCount && ` (${selectedQuestionCount}문제)`}
               </Button>
             </CardContent>
