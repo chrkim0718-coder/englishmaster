@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { BookOpen, Play, LogOut, Trophy, Target, BarChart3, Plus, Sparkles, Loader2, X } from "lucide-react"
 import GameEngine from "@/components/game-engine"
+import { fetchGameQuestions } from "@/lib/fetch-game-questions"
 import { signOut } from "@/lib/actions"
 import QuizInterface from "@/components/quiz-interface"
 import PerformanceDashboard from "@/components/performance-dashboard"
@@ -20,8 +21,20 @@ interface QuizDashboardProps {
 export default function QuizDashboard({ user }: QuizDashboardProps) {
   const [isGameModeActive, setIsGameModeActive] = useState(false);
   // 게임모드로 시작 버튼 핸들러
-  function handleStartGameQuiz() {
-    setIsGameModeActive(true);
+  const [gameQuestions, setGameQuestions] = useState<any[]>([]);
+  const [isLoadingGame, setIsLoadingGame] = useState(false);
+  async function handleStartGameQuiz() {
+    setIsLoadingGame(true);
+    try {
+      const count = parseInt(selectedQuestionCount) || 5;
+      const qs = await fetchGameQuestions(selectedGrammarType, selectedDifficulty, count);
+      setGameQuestions(qs);
+      setIsGameModeActive(true);
+    } catch (e) {
+      toast({ title: "문제 불러오기 실패", description: String(e), variant: "destructive" });
+    } finally {
+      setIsLoadingGame(false);
+    }
   }
   const [selectedGrammarType, setSelectedGrammarType] = useState("")
   const [selectedDifficulty, setSelectedDifficulty] = useState("")
@@ -240,8 +253,8 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
     />
   }
 
-  if (isGameModeActive) {
-    return <GameEngine onExit={() => setIsGameModeActive(false)} />;
+  if (isGameModeActive && gameQuestions.length > 0) {
+    return <GameEngine onExit={() => setIsGameModeActive(false)} questions={gameQuestions} />;
   }
 
   if (isQuizActive) {
@@ -510,12 +523,12 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
               </Button>
               <Button
                 onClick={handleStartGameQuiz}
-                disabled={!selectedGrammarType || !selectedDifficulty || !selectedQuestionCount}
+                disabled={!selectedGrammarType || !selectedDifficulty || !selectedQuestionCount || isLoadingGame}
                 className="w-full h-12 bg-green-600 hover:bg-green-700 text-white text-lg font-medium mt-2"
               >
                 <Play className="h-5 w-5 mr-2" />
-                게임모드로 시작
-                {selectedQuestionCount && ` (${selectedQuestionCount}문제)`}
+                {isLoadingGame ? "문제 불러오는 중..." : "게임모드로 시작"}
+                {selectedQuestionCount && !isLoadingGame && ` (${selectedQuestionCount}문제)`}
               </Button>
             </CardContent>
           </Card>
