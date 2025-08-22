@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { BookOpen, Play, LogOut, Trophy, Target, BarChart3, Plus, Sparkles, Loader2, X } from "lucide-react"
+import GameEngine from "@/components/game-engine"
 import { signOut } from "@/lib/actions"
 import QuizInterface from "@/components/quiz-interface"
 import PerformanceDashboard from "@/components/performance-dashboard"
@@ -240,14 +241,7 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
   }
 
   if (isGameModeActive) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen">
-        <div className="text-2xl font-bold mb-6">게임모드입니다.</div>
-        <Button className="w-40 h-12 bg-gray-600 hover:bg-gray-700 text-white text-lg font-medium" onClick={() => setIsGameModeActive(false)}>
-          돌아가기
-        </Button>
-      </div>
-    );
+    return <GameEngine onExit={() => setIsGameModeActive(false)} />;
   }
 
   if (isQuizActive) {
