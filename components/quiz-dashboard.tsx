@@ -234,7 +234,7 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
       onBack={() => setShowPerformance(false)} 
       onStartWeaknessQuiz={handleStartWeaknessQuiz}
       onRefresh={() => setPerformanceRefreshTrigger(prev => prev + 1)}
-      key={performanceRefreshTrigger} // key를 변경하여 컴포넌트 재마운트
+      key={performanceRefreshTrigger}
     />
   }
 
@@ -249,7 +249,7 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
         user={user}
         isWeaknessQuiz={isWeaknessQuiz}
       />
-    )
+    );
   }
 
   return (
