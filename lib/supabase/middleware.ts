@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+
 
 // Check if Supabase environment variables are available
 export const isSupabaseConfigured =
@@ -61,10 +61,29 @@ export async function updateSession(request: NextRequest) {
 
   const isPublicRoute = request.nextUrl.pathname === "/"
 
-  // 관리자 페이지 접근 제한
+  // 관리자 페이지 접근 제한 (user_profiles의 is_admin 컬럼 사용)
   if (request.nextUrl.pathname.startsWith("/admin")) {
-    if (!user || user.email !== ADMIN_EMAIL) {
-      // JSON 응답으로 "관리자만 접근가능합니다." 메시지 반환
+    if (!user) {
+      return new NextResponse(
+        JSON.stringify({ message: "관리자만 접근가능합니다." }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+    // Supabase 서비스 역할 키로 user_profiles에서 is_admin 확인
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    const { data: profile, error } = await supabaseAdmin
+      .from("user_profiles")
+      .select("is_admin")
+      .eq("id", user.id)
+      .single();
+    if (error || !profile || !profile.is_admin) {
       return new NextResponse(
         JSON.stringify({ message: "관리자만 접근가능합니다." }),
         {
