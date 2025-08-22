@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 
 // Check if Supabase environment variables are available
 export const isSupabaseConfigured =
@@ -60,7 +61,21 @@ export async function updateSession(request: NextRequest) {
 
   const isPublicRoute = request.nextUrl.pathname === "/"
 
-  if (!isAuthRoute && !isPublicRoute) {
+  // 관리자 페이지 접근 제한
+  if (request.nextUrl.pathname.startsWith("/admin")) {
+    if (!user || user.email !== ADMIN_EMAIL) {
+      // JSON 응답으로 "관리자만 접근가능합니다." 메시지 반환
+      return new NextResponse(
+        JSON.stringify({ message: "관리자만 접근가능합니다." }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+  }
+
+  if (!isAuthRoute && !isPublicRoute && !request.nextUrl.pathname.startsWith("/admin")) {
     if (!user) {
       const redirectUrl = new URL("/auth/login", request.url)
       return NextResponse.redirect(redirectUrl)
