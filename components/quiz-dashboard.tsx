@@ -17,10 +17,10 @@ interface QuizDashboardProps {
 }
 
 export default function QuizDashboard({ user }: QuizDashboardProps) {
+  const [isGameModeActive, setIsGameModeActive] = useState(false);
   // 게임모드로 시작 버튼 핸들러
   function handleStartGameQuiz() {
-    // 게임모드 시작 로직: 예시로 alert만 표시
-    alert('게임모드로 시작! (여기에 게임모드 로직을 연결하세요)');
+    setIsGameModeActive(true);
   }
   const [selectedGrammarType, setSelectedGrammarType] = useState("")
   const [selectedDifficulty, setSelectedDifficulty] = useState("")
@@ -229,6 +229,7 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
     setShowPerformance(false)
   }
 
+
   if (showPerformance) {
     return <PerformanceDashboard 
       onBack={() => setShowPerformance(false)} 
@@ -236,6 +237,17 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
       onRefresh={() => setPerformanceRefreshTrigger(prev => prev + 1)}
       key={performanceRefreshTrigger}
     />
+  }
+
+  if (isGameModeActive) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <div className="text-2xl font-bold mb-6">게임모드입니다.</div>
+        <Button className="w-40 h-12 bg-gray-600 hover:bg-gray-700 text-white text-lg font-medium" onClick={() => setIsGameModeActive(false)}>
+          돌아가기
+        </Button>
+      </div>
+    );
   }
 
   if (isQuizActive) {
