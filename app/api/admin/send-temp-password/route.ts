@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
-import nodemailer from "nodemailer";
+
 import { createServiceClient } from "@/lib/supabase/service";
 
 export async function POST(request: NextRequest) {
@@ -28,25 +28,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "비밀번호 변경 실패" }, { status: 500 });
     }
 
-    // 3. 메일 전송
-    const transporter = nodemailer.createTransport({
-      host: process.env.BREVO_SMTP_HOST,
-      port: Number(process.env.BREVO_SMTP_PORT),
-      auth: {
-        user: process.env.BREVO_SMTP_USER,
-        pass: process.env.BREVO_SMTP_PASS,
-      },
-    });
-
-    const mailOptions = {
-      from: `관리자 <${process.env.BREVO_SMTP_USER}>`,
-      to: email,
-      subject: "임시 비밀번호 안내",
-      html: `<p>임시 비밀번호: <b>${tempPassword}</b></p><p>로그인 후 반드시 비밀번호를 변경해 주세요.</p>`,
-    };
-
-    await transporter.sendMail(mailOptions);
-    return NextResponse.json({ success: true });
+  // nodemailer 관련 코드 제거됨. 메일 전송 기능이 비활성화되었습니다.
+  return NextResponse.json({ success: true, message: "nodemailer 관련 코드가 제거되어 메일은 전송되지 않습니다." });
   } catch (error) {
     console.error("임시 비밀번호 메일 전송 오류:", error);
     return NextResponse.json({ success: false, error: "메일 전송 실패" }, { status: 500 });
