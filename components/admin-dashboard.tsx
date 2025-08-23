@@ -223,7 +223,7 @@ export default function AdminDashboard() {
   }, [])
 
   useEffect(() => {
-    if (activeTab === "users") {
+    if (activeTab === "users" || activeTab === "overview") {
       fetchUsers()
     } else if (activeTab === "questions") {
       fetchQuestions()
@@ -1233,16 +1233,16 @@ export default function AdminDashboard() {
           ];
           return (
             <TabsList
-              className="w-full gap-1 text-sm grid grid-cols-3 lg:grid-cols-none lg:flex lg:flex-row"
+              className="w-full grid grid-cols-3 gap-1 text-xs lg:flex lg:flex-row lg:grid-cols-none"
             >
               {tabList.map(tab => (
                 <TabsTrigger
                   key={tab.value}
                   value={tab.value}
-                  className="flex items-center gap-2 justify-center min-w-0 truncate"
+                  className="flex items-center justify-center gap-1 min-w-0 px-1 py-2 truncate"
                 >
                   {tab.icon}
-                  {tab.label}
+                  <span className="truncate">{tab.label}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
