@@ -1233,13 +1233,13 @@ export default function AdminDashboard() {
           ];
           return (
             <TabsList
-              className="w-full grid grid-cols-3 gap-1 text-xs lg:flex lg:flex-row lg:grid-cols-none"
+              className="w-full grid grid-cols-3 gap-x-1 gap-y-3 text-xs h-auto min-h-0 overflow-visible lg:flex lg:flex-row lg:grid-cols-none"
             >
               {tabList.map(tab => (
                 <TabsTrigger
                   key={tab.value}
                   value={tab.value}
-                  className="flex items-center justify-center gap-1 min-w-0 px-1 py-2 truncate"
+                  className="flex w-full items-center justify-center gap-1 min-w-0 px-1 py-2 truncate mb-2 lg:mb-0"
                 >
                   {tab.icon}
                   <span className="truncate">{tab.label}</span>
