@@ -36,9 +36,14 @@ export async function POST(request: NextRequest) {
     console.log("Generating questions with:", { grammarType, difficultyLevel: koreanDifficulty, count, aiProvider: body.aiProvider })
     const questions = await generateGrammarQuestions(grammarType, koreanDifficulty, count, body.aiProvider)
 
-    // Add delay for individual generation to prevent rate limiting
-    console.log("⏳ Adding 1 second delay to prevent rate limiting...")
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    // Add delay for individual generation to prevent rate limiting (Gemini는 3초)
+    if (body.aiProvider === 'gemini' || !body.aiProvider) {
+      console.log("⏳ Adding 3 seconds delay for Gemini to prevent rate limiting...")
+      await new Promise(resolve => setTimeout(resolve, 3000))
+    } else {
+      console.log("⏳ Adding 1 second delay to prevent rate limiting...")
+      await new Promise(resolve => setTimeout(resolve, 1000))
+    }
 
     const supabase = createServiceClient()
     const { data, error } = await supabase.from("grammar_questions").insert(questions).select()
@@ -96,8 +101,13 @@ async function handleBatchGeneration(body: any) {
         
         // Add delay between requests to avoid rate limiting (except for the last request)
         if (i < grammarTypes.length - 1) {
-          console.log(`⏳ Waiting 2 seconds before next request...`)
-          await new Promise(resolve => setTimeout(resolve, 2000))
+          if (aiProvider === 'gemini' || !aiProvider) {
+            console.log(`⏳ Waiting 3 seconds before next Gemini request...`)
+            await new Promise(resolve => setTimeout(resolve, 3000))
+          } else {
+            console.log(`⏳ Waiting 2 seconds before next request...`)
+            await new Promise(resolve => setTimeout(resolve, 2000))
+          }
         }
       } catch (error) {
         console.error(`❌ Failed to generate ${grammarType} questions:`, error)

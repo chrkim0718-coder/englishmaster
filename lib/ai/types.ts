@@ -25,6 +25,7 @@ export interface AIProvider {
 }
 
 export const GRAMMAR_TYPES = [
+  "랜덤", // 모든 유형에서 랜덤 출제
   "가정법", "관계사", "동명사", "부정사", "분사", 
   "수동태", "시제", "전치사", "접속사", "조동사"
 ] as const

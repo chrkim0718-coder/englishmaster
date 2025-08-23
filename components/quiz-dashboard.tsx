@@ -13,8 +13,10 @@ import { GRAMMAR_TYPES, REVERSE_DIFFICULTY_MAPPING } from "@/lib/ai/types"
 import { useToast } from "@/hooks/use-toast"
 
 interface QuizDashboardProps {
-  user: { id: string; email: string }
+  user: { id: string; email: string; is_admin?: boolean }
 }
+
+// 관리자 이메일 목록 제거, DB is_admin 사용
 
 export default function QuizDashboard({ user }: QuizDashboardProps) {
   const [selectedGrammarType, setSelectedGrammarType] = useState("")
@@ -161,23 +163,19 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
       selectedQuestionCount,
       selectedScoringMode 
     })
-    
     if (!selectedGrammarType) {
       console.log('❌ Grammar type not selected')
       return
     }
-    
     if (!selectedDifficulty) {
       console.log('❌ Difficulty not selected')
       return
     }
-
     if (!selectedQuestionCount) {
       console.log('❌ Question count not selected')
       return
     }
-    
-    console.log('✅ All selections valid, activating quiz...')
+    // '랜덤' 선택 시 실제 유형은 빈 문자열로 전달
     setIsQuizActive(true)
     console.log('✅ Quiz state set to active!')
   }
@@ -262,13 +260,23 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
                 <p className="text-sm text-gray-600">AI 영어 문법 연습</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="grid grid-cols-1 gap-2 w-full sm:flex sm:flex-row sm:items-center sm:gap-4 sm:w-auto">
+              <div className="flex items-center gap-2 text-sm text-gray-600 col-span-1">
                 <BookOpen className="h-4 w-4" />
                 {user.email}
               </div>
-              <form action={signOut}>
-                <Button variant="outline" size="sm" type="submit">
+              {user.is_admin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-blue-600 text-blue-600 hover:bg-blue-50 w-full sm:w-auto col-span-1"
+                  onClick={() => window.location.href = "/admin"}
+                >
+                  관리자페이지
+                </Button>
+              )}
+              <form action={signOut} className="w-full sm:w-auto col-span-1">
+                <Button variant="outline" size="sm" type="submit" className="w-full sm:w-auto">
                   <LogOut className="h-4 w-4 mr-2" />
                   로그아웃
                 </Button>
@@ -430,15 +438,18 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">
-                    문제 수 
-                    {availableQuestionCount > 0 && (
+                    문제 수
+                    {selectedGrammarType !== "랜덤" && availableQuestionCount > 0 && (
                       <span className="text-xs text-gray-500 ml-1">
                         (최대 {availableQuestionCount}개 가능)
                       </span>
                     )}
+                    {selectedGrammarType === "랜덤" && (
+                      <span className="text-xs text-gray-500 ml-1">(최대 50개 가능)</span>
+                    )}
                   </label>
-                  <Select 
-                    value={selectedQuestionCount} 
+                  <Select
+                    value={selectedQuestionCount}
                     onValueChange={setSelectedQuestionCount}
                     disabled={!selectedGrammarType || !selectedDifficulty}
                   >
@@ -446,20 +457,26 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
                       <SelectValue placeholder="문제 수 선택" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableQuestionCount > 0 && (
-                        <>
-                          {[5, 10, 15, 20].filter(count => count <= availableQuestionCount).map((count) => (
+                      {selectedGrammarType === "랜덤"
+                        ? Array.from({ length: 10 }, (_, i) => (i + 1) * 5).map((count) => (
                             <SelectItem key={count} value={count.toString()}>
                               {count}문제
                             </SelectItem>
-                          ))}
-                          {availableQuestionCount > 20 && (
-                            <SelectItem value={availableQuestionCount.toString()}>
-                              {availableQuestionCount}문제 (전체)
-                            </SelectItem>
+                          ))
+                        : availableQuestionCount > 0 && (
+                            <>
+                              {[5, 10, 15, 20].filter(count => count <= availableQuestionCount).map((count) => (
+                                <SelectItem key={count} value={count.toString()}>
+                                  {count}문제
+                                </SelectItem>
+                              ))}
+                              {availableQuestionCount > 20 && (
+                                <SelectItem value={availableQuestionCount.toString()}>
+                                  {availableQuestionCount}문제 (전체)
+                                </SelectItem>
+                              )}
+                            </>
                           )}
-                        </>
-                      )}
                     </SelectContent>
                   </Select>
                 </div>

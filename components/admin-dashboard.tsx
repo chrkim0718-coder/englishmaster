@@ -1217,45 +1217,31 @@ export default function AdminDashboard() {
         <p className="text-muted-foreground mt-2">사용자, 문제 관리 및 시스템 현황을 모니터링하세요</p>
       </div>
 
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            전체 현황
-          </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            사용자 관리
-          </TabsTrigger>
-          <TabsTrigger value="questions" className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4" />
-            문제 관리
-          </TabsTrigger>
-          <TabsTrigger value="data" className="flex items-center gap-2">
-            <Database className="h-4 w-4" />
-            데이터 관리
-          </TabsTrigger>
-          <TabsTrigger value="validate" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            데이터 검증
-          </TabsTrigger>
-          <TabsTrigger value="question-validation" className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4" />
-            문제별 검증
-          </TabsTrigger>
-          <TabsTrigger value="duplicates" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            중복 문제 관리
-          </TabsTrigger>
-          <TabsTrigger value="generate" className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            문제 일괄 생성
-          </TabsTrigger>
-          <TabsTrigger value="models" className="flex items-center gap-2">
-            <Cpu className="h-4 w-4" />
-            AI 모델 설정
-          </TabsTrigger>
-        </TabsList>
+        {(() => {
+          const tabList = [
+            { value: "overview", label: "전체 현황", icon: <BarChart3 className="h-4 w-4" /> },
+            { value: "users", label: "사용자 관리", icon: <Users className="h-4 w-4" /> },
+            { value: "questions", label: "문제 관리", icon: <BookOpen className="h-4 w-4" /> },
+            { value: "data", label: "데이터 관리", icon: <Database className="h-4 w-4" /> },
+            { value: "validate", label: "데이터 검증", icon: <Settings className="h-4 w-4" /> },
+            { value: "question-validation", label: "문제별 검증", icon: <BookOpen className="h-4 w-4" /> },
+            { value: "duplicates", label: "중복 문제 관리", icon: <Settings className="h-4 w-4" /> },
+            { value: "generate", label: "문제 일괄 생성", icon: <Plus className="h-4 w-4" /> },
+            { value: "models", label: "AI 모델 설정", icon: <Cpu className="h-4 w-4" /> },
+          ];
+          return (
+            <TabsList className="flex flex-wrap w-full gap-2">
+              {tabList.map(tab => (
+                <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2">
+                  {tab.icon}
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          );
+        })()}
 
         <TabsContent value="overview" className="space-y-6">
           {/* System Stats */}
