@@ -1233,7 +1233,7 @@ export default function AdminDashboard() {
           ];
           return (
             <TabsList
-              className="grid w-full grid-cols-3 gap-1 text-sm !block !h-auto !overflow-visible"
+              className="grid w-full grid-cols-3 lg:grid-cols-9 gap-1 text-sm !block !h-auto !overflow-visible"
             >
               {tabList.map(tab => (
                 <TabsTrigger
