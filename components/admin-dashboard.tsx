@@ -1233,7 +1233,7 @@ export default function AdminDashboard() {
           ];
           return (
             <TabsList
-              className="grid w-full grid-cols-3 lg:grid-cols-9 gap-1 text-sm !block !h-auto !overflow-visible"
+              className="w-full gap-1 text-sm grid grid-cols-3 lg:grid-cols-none lg:flex lg:flex-row"
             >
               {tabList.map(tab => (
                 <TabsTrigger
@@ -1259,7 +1259,7 @@ export default function AdminDashboard() {
                     <Users className="h-5 w-5 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-gray-900">{stats?.totalUsers || 0}</p>
+                    <p className="text-2xl font-bold text-gray-900">{users.length}</p>
                     <p className="text-sm text-gray-600">전체 사용자</p>
                   </div>
                 </div>
@@ -1491,7 +1491,7 @@ export default function AdminDashboard() {
                               </span>
                             )}
                           </div>
-                          <p className="text-sm text-gray-600">가입일: {new Date(user.created_at).toLocaleDateString()}</p>
+                          <p className="text-sm text-gray-600">가입일: {new Date(user.created_at).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
