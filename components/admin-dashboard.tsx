@@ -1232,9 +1232,15 @@ export default function AdminDashboard() {
             { value: "models", label: "AI 모델 설정", icon: <Cpu className="h-4 w-4" /> },
           ];
           return (
-            <TabsList className="flex flex-wrap w-full gap-2">
+            <TabsList
+              className="grid w-full grid-cols-3 gap-1 text-sm !block !h-auto !overflow-visible"
+            >
               {tabList.map(tab => (
-                <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2">
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className="flex items-center gap-2 justify-center min-w-0 truncate"
+                >
                   {tab.icon}
                   {tab.label}
                 </TabsTrigger>
