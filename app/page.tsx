@@ -23,9 +23,20 @@ export default async function HomePage() {
     redirect("/auth/login")
   }
 
+  // user_profiles에서 is_admin 조회
+  let is_admin = false;
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .single();
+  if (profile && typeof profile.is_admin === "boolean") {
+    is_admin = profile.is_admin;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <QuizDashboard user={{ id: user.id, email: user.email || "" }} />
+      <QuizDashboard user={{ id: user.id, email: user.email || "", is_admin }} />
     </div>
   )
 }

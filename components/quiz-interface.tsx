@@ -62,76 +62,83 @@ export default function QuizInterface({
 
   const fetchQuestions = async () => {
     try {
-      console.log('🔍 Fetching questions for:', { grammarType, difficulty, questionCount, isWeaknessQuiz })
-      
       let url: string
-      if (isWeaknessQuiz) {
-        // 취약 유형 퀴즈: 틀린 문제만 가져오기
-        console.log('🎯 Weakness quiz mode - fetching incorrect questions only')
-        url = `/api/questions/incorrect?grammarType=${encodeURIComponent(grammarType)}&limit=${questionCount}&userId=${user.id}`
+      if (grammarType === "랜덤") {
+        // 랜덤: 모든 유형에서 균등분할로 문제 요청
+        const grammarTypes = [
+          "가정법", "관계사", "동명사", "부정사", "분사", "수동태", "시제", "전치사", "접속사", "조동사"
+        ];
+        const total = Number(questionCount) || 10;
+        const perType = Math.floor(total / grammarTypes.length);
+        const remainder = total % grammarTypes.length;
+  let allQuestions: Question[] = [];
+        for (let i = 0; i < grammarTypes.length; i++) {
+          // 나머지는 앞에서부터 하나씩 더함
+          const count = perType + (i < remainder ? 1 : 0);
+          if (count === 0) continue;
+          const url = `/api/questions?grammarType=${encodeURIComponent(grammarTypes[i])}&difficultyLevel=${difficulty}&limit=${count}`;
+          const response = await fetch(url);
+          const data = await response.json();
+          if (response.ok && data.questions?.length > 0) {
+            allQuestions = allQuestions.concat(data.questions);
+          }
+        }
+        // 문제를 랜덤하게 섞음
+        allQuestions = allQuestions.sort(() => Math.random() - 0.5).slice(0, total);
+        if (allQuestions.length === 0) {
+          toast({
+            title: "사용 가능한 문제가 없습니다",
+            description: "랜덤 유형에 해당하는 문제가 없습니다.",
+            variant: "destructive",
+          });
+          onComplete();
+          return;
+        }
+        setQuestions(allQuestions);
+        return;
+      } else if (isWeaknessQuiz) {
+        url = `/api/questions/incorrect?grammarType=${encodeURIComponent(grammarType)}&limit=${questionCount}&userId=${user.id}`;
       } else {
-        // 일반 퀴즈: 기존 방식
-        url = `/api/questions?grammarType=${encodeURIComponent(grammarType)}&difficultyLevel=${difficulty}&limit=${questionCount}`
+        url = `/api/questions?grammarType=${encodeURIComponent(grammarType)}&difficultyLevel=${difficulty}&limit=${questionCount}`;
       }
-      
-      console.log('🌐 Making request to URL:', url)
-      const response = await fetch(url)
-      
-      console.log('📨 Response received:', {
-        ok: response.ok,
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
-      })
-
-      const data = await response.json()
-      console.log('📝 Questions response:', data)
-
+      const response = await fetch(url);
+      const data = await response.json();
       if (!response.ok) {
-        console.error('❌ API Error:', data)
-        const errorMessage = data.error || data.message || "Failed to fetch questions"
-        throw new Error(errorMessage)
+        const errorMessage = data.error || data.message || "Failed to fetch questions";
+        throw new Error(errorMessage);
       }
-
       if (data.questions?.length === 0 || data.total === 0) {
-        console.log('⚠️ No questions found')
-        const message = isWeaknessQuiz 
+        const message = isWeaknessQuiz
           ? data.message || "이 문법유형에서 틀린 문제가 없습니다. 새로운 문제를 풀어보세요!"
-          : "이 문법유형과 난이도에 해당하는 문제가 없습니다. 다른 조합을 시도해보세요."
-        
+          : "이 문법유형과 난이도에 해당하는 문제가 없습니다. 다른 조합을 시도해보세요.";
         if (isWeaknessQuiz) {
-          // 취약 문제가 없는 경우: 축하 화면 표시
-          setNoQuestionsFound(true)
-          setNoQuestionsMessage(message)
-          setIsLoading(false)
-          return
+          setNoQuestionsFound(true);
+          setNoQuestionsMessage(message);
+          setIsLoading(false);
+          return;
         } else {
-          // 일반 퀴즈에서 문제가 없는 경우: 즉시 돌아가기
           toast({
             title: "사용 가능한 문제가 없습니다",
             description: message,
             variant: "destructive",
-          })
-          onComplete()
-          return
+          });
+          onComplete();
+          return;
         }
       }
-
-      console.log(`✅ Loaded ${data.questions.length} questions`)
-      setQuestions(data.questions)
+  // 항상 문제를 랜덤하게 섞어서 출제
+  const shuffled = (data.questions || []).sort(() => Math.random() - 0.5);
+  setQuestions(shuffled);
     } catch (error) {
-      console.error("❌ Error fetching questions:", error)
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
-      console.error("❌ Detailed error:", errorMessage)
-      
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       toast({
         title: "Error",
         description: `Failed to load questions: ${errorMessage}`,
         variant: "destructive",
-      })
-      onComplete()
+      });
+      onComplete();
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 

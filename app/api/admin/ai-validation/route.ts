@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { generateGeminiValidation } from "@/lib/ai/gemini"
 import { NextRequest, NextResponse } from "next/server"
 
 interface AIValidationResult {
@@ -209,12 +210,113 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { questionIds, lmstudioUrl } = await request.json()
+    const { questionIds, lmstudioUrl, model } = await request.json()
 
     if (!questionIds || !Array.isArray(questionIds) || questionIds.length === 0) {
       return NextResponse.json({ error: "Question IDs are required" }, { status: 400 })
     }
 
+    // Gemini 분기: lmstudioUrl 없이 처리
+    if (model === 'gemini') {
+      // Fetch questions to validate
+      const { data: questions, error: fetchError } = await supabase
+        .from("grammar_questions")
+        .select("*")
+        .in("id", questionIds)
+
+      if (fetchError) {
+        console.error("Error fetching questions:", fetchError)
+        return NextResponse.json({ error: "Failed to fetch questions" }, { status: 500 })
+      }
+
+      if (!questions || questions.length === 0) {
+        return NextResponse.json({ error: "No questions found" }, { status: 404 })
+      }
+
+      // 실제 Gemini API를 사용한 검증 및 60점 미만 자동 수정
+      const validationResults: AIValidationResult[] = [];
+      for (const q of questions) {
+        try {
+          const geminiResult = await generateGeminiValidation(q);
+          // 60점 미만이면 문제, 해설, 상태 등 즉시 업데이트
+          if (geminiResult.score < 60) {
+            // suggestions에서 보기/정답/해설 자동 추출 및 수정
+            let updateObj: any = {
+              is_validated: false,
+              validation_status: "needs_review",
+              validated_by: user.id,
+              validated_at: new Date().toISOString(),
+            };
+            let modifiedFields: string[] = [];
+            // suggestions에서 각 항목 추출
+            for (const s of geminiResult.suggestions) {
+              if (/보기|선택지|option/i.test(s)) {
+                const match = s.match(/A[.:-]?\s*([^,]+),?\s*B[.:-]?\s*([^,]+),?\s*C[.:-]?\s*([^,]+),?\s*D[.:-]?\s*([^,]+)/i);
+                if (match) {
+                  updateObj.option_a = match[1].trim();
+                  updateObj.option_b = match[2].trim();
+                  updateObj.option_c = match[3].trim();
+                  updateObj.option_d = match[4].trim();
+                  modifiedFields.push('보기');
+                }
+              }
+              if (/정답|answer/i.test(s)) {
+                const match = s.match(/([A-D])/i);
+                if (match) {
+                  updateObj.correct_answer = match[1].toUpperCase();
+                  modifiedFields.push('정답');
+                }
+              }
+              if (/해설|설명|explanation/i.test(s)) {
+                const match = s.match(/해설[\s:：-]+(.+)/i) || s.match(/explanation[\s:：-]+(.+)/i);
+                if (match) {
+                  updateObj.explanation = match[1].trim();
+                  modifiedFields.push('해설');
+                } else {
+                  updateObj.explanation = s.replace(/^(해설|설명|explanation)[\s:：-]*/i, '').trim();
+                  modifiedFields.push('해설');
+                }
+              }
+            }
+            const validationNotes = `AI 검증 점수: ${geminiResult.score}/100\n문제점: ${geminiResult.issues.join(", ")}\n제안사항: ${geminiResult.suggestions.join(", ")}\nAI 평가: ${geminiResult.aiNotes}` + (modifiedFields.length > 0 ? `\n[자동수정됨: ${modifiedFields.join(", ")}]` : '');
+            updateObj.validation_notes = validationNotes;
+            await supabase
+              .from("grammar_questions")
+              .update(updateObj)
+              .eq("id", q.id);
+          }
+          validationResults.push({
+            questionId: q.id,
+            isValid: geminiResult.isValid,
+            score: geminiResult.score,
+            issues: geminiResult.issues,
+            suggestions: geminiResult.suggestions,
+            aiNotes: geminiResult.aiNotes,
+          });
+        } catch (err: any) {
+          validationResults.push({
+            questionId: q.id,
+            isValid: false,
+            score: 0,
+            issues: [err.message || 'Gemini 검증 실패'],
+            suggestions: [],
+            aiNotes: err.message || 'Gemini 검증 실패',
+          });
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        validatedCount: validationResults.length,
+        failedCount: validationResults.filter(r => !r.isValid).length,
+        approvedCount: validationResults.filter(r => r.isValid && r.score >= 70).length,
+        needsReviewCount: validationResults.filter(r => r.isValid && r.score < 70).length,
+        results: validationResults,
+        message: `${validationResults.length}개 문제가 Gemini로 검증되었습니다.`
+      })
+    }
+
+    // LMStudio 분기 (기존 로직)
     if (!lmstudioUrl) {
       return NextResponse.json({ error: "LMStudio URL is required" }, { status: 400 })
     }
