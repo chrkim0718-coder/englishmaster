@@ -204,6 +204,8 @@ export default function AdminDashboard() {
     currentQuestion: '',
     status: ''
   })
+  // 검증 모델 선택 상태
+  const [validationModel, setValidationModel] = useState<'gemini' | 'lmstudio'>('gemini')
   
   const { toast } = useToast()
 
@@ -1029,21 +1031,8 @@ export default function AdminDashboard() {
   };
 
   const performAIValidation = async (selectedQuestions?: string[]) => {
-    // Get the effective LMStudio URL (prioritize settings over manual input)
-    const effectiveUrl = lmstudioSettings?.localServer || lmstudioUrl;
-    
-    if (!effectiveUrl) {
-      toast({
-        title: "오류",
-        description: "LMStudio URL을 설정해주세요. AI 모델 설정에서 연결을 확인하거나 수동으로 URL을 입력하세요.",
-        variant: "destructive",
-      })
-      return
-    }
-
     // Use selected questions or current page questions
     const questionIds = selectedQuestions || validationQuestions.map(q => q.id)
-    
     if (questionIds.length === 0) {
       toast({
         title: "오류",
@@ -1061,12 +1050,25 @@ export default function AdminDashboard() {
       currentQuestion: '',
       status: '연결 확인 중...'
     })
-    
+
     try {
-      // 1. 먼저 LMStudio 연결 테스트
-      const connectionTest = await testLMStudioConnection()
-      if (!connectionTest.connected) {
-        throw new Error(`LMStudio 연결 실패: ${connectionTest.message}`)
+      let effectiveUrl = lmstudioSettings?.localServer || lmstudioUrl;
+      // LMStudio 연결 테스트는 lmstudio 선택 시에만
+      if (validationModel === 'lmstudio') {
+        if (!effectiveUrl) {
+          toast({
+            title: "오류",
+            description: "LMStudio URL을 설정해주세요. AI 모델 설정에서 연결을 확인하거나 수동으로 URL을 입력하세요.",
+            variant: "destructive",
+          })
+          setIsAIValidating(false)
+          return
+        }
+        // 1. 먼저 LMStudio 연결 테스트
+        const connectionTest = await testLMStudioConnection()
+        if (!connectionTest.connected) {
+          throw new Error(`LMStudio 연결 실패: ${connectionTest.message}`)
+        }
       }
 
       setAiValidationProgress(prev => ({
@@ -1100,7 +1102,7 @@ export default function AdminDashboard() {
             },
             body: JSON.stringify({
               questionIds: [questionId], // 한 개씩 처리
-              lmstudioUrl: effectiveUrl // Use the effective URL
+              ...(validationModel === 'lmstudio' ? { lmstudioUrl: effectiveUrl } : { model: 'gemini' })
             }),
           })
 
@@ -1147,7 +1149,7 @@ export default function AdminDashboard() {
 
         // 각 문제 처리 후 잠시 대기 (서버 부하 방지)
         if (i < questionIds.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500))
+          await new Promise(resolve => setTimeout(resolve, 5000))
         }
       }
 
@@ -2112,8 +2114,23 @@ export default function AdminDashboard() {
               </p>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Grammar Type Filter */}
-              <div className="flex items-center gap-4">
+              {/* Grammar Type & Model Filter */}
+              <div className="flex flex-col sm:flex-row flex-wrap items-center gap-4 gap-y-4 py-2 w-full">
+                {/* 검증 모델 선택 */}
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    검증 모델
+                  </label>
+                  <Select value={validationModel} onValueChange={value => setValidationModel(value as "gemini" | "lmstudio")}> 
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="gemini">Gemini</SelectItem>
+                      <SelectItem value="lmstudio">LMStudio</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div>
                   <label className="text-sm font-medium text-gray-700 mb-2 block">
                     문법 유형 필터
@@ -2164,10 +2181,23 @@ export default function AdminDashboard() {
               {/* AI Validation Controls */}
               <div className="border rounded-lg p-4 bg-blue-50">
                 <h4 className="font-medium text-blue-800 mb-3">🤖 AI 1차 검증</h4>
-                
+                <div className="flex items-center gap-2 mb-4">
+                  <label className="text-xs font-medium text-gray-700">검증 모델</label>
+                  <div className="w-full max-w-xs z-10">
+                    <Select value={validationModel} onValueChange={v => setValidationModel(v as 'gemini' | 'lmstudio')}>
+                      <SelectTrigger className="w-full h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="gemini">Gemini</SelectItem>
+                        <SelectItem value="lmstudio">LMStudio</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 {/* LMStudio Status */}
                 <div className="mb-4 p-3 bg-white rounded border">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-2" style={{ opacity: validationModel === 'lmstudio' ? 1 : 0.5, pointerEvents: validationModel === 'lmstudio' ? 'auto' : 'none' }}>
                     <span className="text-sm font-medium text-gray-700">LMStudio 상태</span>
                     <div className="flex items-center gap-2">
                       {lmstudioSettings ? (
@@ -2180,7 +2210,6 @@ export default function AdminDashboard() {
                         size="sm"
                         onClick={async () => {
                           const currentUrl = lmstudioSettings?.localServer || lmstudioUrl;
-                          
                           if (!currentUrl) {
                             toast({
                               title: "URL 없음",
@@ -2189,16 +2218,12 @@ export default function AdminDashboard() {
                             });
                             return;
                           }
-
-                          // 로딩 토스트 표시
                           toast({
                             title: "🔍 연결 확인 중...",
                             description: `${currentUrl}에 연결을 시도하고 있습니다.`,
                           });
-                          
                           try {
                             const result = await testLMStudioConnection();
-                            
                             if (result.connected) {
                               toast({
                                 title: "✅ 연결 성공",
@@ -2208,7 +2233,7 @@ export default function AdminDashboard() {
                             } else {
                               toast({
                                 title: "❌ 연결 실패",
-                                description: `${result.message}\n\n${result.details || ''}\n\nURL: ${currentUrl}\n\n🔧 해결 방법:\n1. LMStudio를 실행해주세요\n2. Developer → Local Server로 이동\n3. "Start Server" 버튼을 클릭\n4. 표시된 URL을 사용해주세요`,
+                                description: `${result.message}\n\n${result.details || ''}\n\nURL: ${currentUrl}\n\n🔧 해결 방법:\n1. LMStudio를 실행해주세요\n2. Developer → Local Server로 이동\n3. \"Start Server\" 버튼을 클릭\n4. 표시된 URL을 사용해주세요`,
                                 variant: "destructive"
                               });
                             }
@@ -2221,6 +2246,7 @@ export default function AdminDashboard() {
                           }
                         }}
                         className="text-xs"
+                        disabled={validationModel !== 'lmstudio'}
                       >
                         연결 테스트
                       </Button>
@@ -2269,6 +2295,7 @@ export default function AdminDashboard() {
                       onChange={(e) => setLmstudioUrl(e.target.value)}
                       placeholder="예: http://localhost:1234 또는 http://127.0.0.1:1234"
                       className="max-w-md"
+                      disabled={validationModel !== 'lmstudio'}
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       {lmstudioSettings?.localServer ? 
@@ -2560,6 +2587,36 @@ export default function AdminDashboard() {
                             className="bg-green-600 hover:bg-green-700"
                           >
                             {validatingQuestions.has(question.id) ? "처리 중..." : "승인"}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            onClick={async () => {
+                              const res = await fetch(`/api/admin/questions/${question.id}/autofix`, { method: 'POST' });
+                              const result = await res.json();
+                              if (result.success && result.revalidation) {
+                                toast({
+                                  title: '자동수정 및 재검증 완료',
+                                  description: `재검증 점수: ${result.revalidation.score}/100\nAI 피드백: ${result.revalidation.aiNotes}`,
+                                });
+                              } else if (result.success) {
+                                toast({ title: '자동수정 완료', description: 'AI가 문제를 자동으로 수정했습니다.' });
+                              } else {
+                                toast({ title: '자동수정 실패', description: result.error || '오류가 발생했습니다.', variant: 'destructive' });
+                              }
+                              // 다음 문제로 자동 이동
+                              fetchQuestions();
+                              setTimeout(() => {
+                                setValidationCurrentPage((prev) => {
+                                  if (validationCurrentPage < validationTotalPages) {
+                                    return prev + 1;
+                                  }
+                                  return prev;
+                                });
+                              }, 800);
+                            }}
+                            disabled={validatingQuestions.has(question.id)}
+                          >
+                            자동수정
                           </Button>
                         </div>
                       </div>

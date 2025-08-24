@@ -126,7 +126,9 @@ export default function QuizInterface({
           return;
         }
       }
-      setQuestions(data.questions);
+  // 항상 문제를 랜덤하게 섞어서 출제
+  const shuffled = (data.questions || []).sort(() => Math.random() - 0.5);
+  setQuestions(shuffled);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       toast({

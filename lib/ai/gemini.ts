@@ -1,4 +1,139 @@
-// Gemini AI Provider
+// 자동수정: 특정 문제를 Gemini로 검증하고, 60점 미만이면 AI 제안으로 DB를 업데이트
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+
+export async function runGeminiValidationAndAutoFix(supabase: any, questionId: string) {
+  // 문제 불러오기
+  const { data: question, error: fetchError } = await supabase
+    .from("grammar_questions")
+    .select("*")
+    .eq("id", questionId)
+    .single();
+  if (fetchError || !question) {
+    return { success: false, error: "문제 조회 실패" };
+  }
+
+  // Gemini 검증
+  let geminiResult;
+  try {
+    geminiResult = await generateGeminiValidation(question);
+  } catch (err: any) {
+    return { success: false, error: "Gemini 검증 실패: " + err.message };
+  }
+
+  // 60점 미만이면 AI 제안으로 자동수정
+  if (geminiResult.score < 60) {
+    let updateObj: any = {};
+    let modifiedFields: string[] = [];
+    for (const s of geminiResult.suggestions) {
+      if (/보기|선택지|option/i.test(s)) {
+        const match = s.match(/A[.:-]?\s*([^,]+),?\s*B[.:-]?\s*([^,]+),?\s*C[.:-]?\s*([^,]+),?\s*D[.:-]?\s*([^,]+)/i);
+        if (match) {
+          updateObj.option_a = match[1].trim();
+          updateObj.option_b = match[2].trim();
+          updateObj.option_c = match[3].trim();
+          updateObj.option_d = match[4].trim();
+          modifiedFields.push('보기');
+        }
+      }
+      if (/정답|answer/i.test(s)) {
+        const match = s.match(/([A-D])/i);
+        if (match) {
+          updateObj.correct_answer = match[1].toUpperCase();
+          modifiedFields.push('정답');
+        }
+      }
+      if (/해설|설명|explanation/i.test(s)) {
+        const match = s.match(/해설[\s:：-]+(.+)/i) || s.match(/explanation[\s:：-]+(.+)/i);
+        if (match) {
+          updateObj.explanation = match[1].trim();
+          modifiedFields.push('해설');
+        } else {
+          updateObj.explanation = s.replace(/^(해설|설명|explanation)[\s:：-]*/i, '').trim();
+          modifiedFields.push('해설');
+        }
+      }
+    }
+    if (Object.keys(updateObj).length > 0) {
+      updateObj.validation_notes = `AI 자동수정: ${modifiedFields.join(", ")}`;
+      const { error: updateError } = await supabase
+        .from("grammar_questions")
+        .update(updateObj)
+        .eq("id", questionId);
+      if (updateError) {
+        return { success: false, error: "DB 업데이트 실패: " + updateError.message };
+      }
+      return { success: true };
+    }
+  }
+  // 60점 이상이거나 수정할 내용 없음
+  return { success: true };
+}
+import type { GrammarQuestion } from "../gemini";
+
+export interface GeminiValidationResult {
+  isValid: boolean;
+  score: number;
+  issues: string[];
+  suggestions: string[];
+  aiNotes: string;
+}
+
+export async function generateGeminiValidation(question: GrammarQuestion): Promise<GeminiValidationResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY environment variable is not set");
+
+  const prompt = `다음 영어 문법 문제를 검증해주세요. 문제의 정확성, 선택지의 적절성, 정답의 올바름, 해설의 명확성을 평가해주세요.\n\n**문제 정보:**\n- 문법 유형: ${question.grammar_type}\n- 난이도: ${question.difficulty_level}\n- 문제: ${question.question_text}\n- 선택지:\n  A. ${question.option_a}\n  B. ${question.option_b}\n  C. ${question.option_c}\n  D. ${question.option_d}\n- 정답: ${question.correct_answer}\n- 해설: ${question.explanation}\n\n**검증 기준:**\n1. 문제가 명확하고 이해하기 쉬운가?\n2. 선택지가 적절하고 혼동을 줄 수 있는가?\n3. 정답이 올바른가?\n4. 해설이 명확하고 교육적인가?\n5. 문법 유형과 난이도가 적절한가?\n\n다음 JSON 형식으로 응답해주세요:\n{\n  "isValid": true/false,\n  "score": 0-100,\n  "issues": ["발견된 문제점들"],\n  "suggestions": ["개선 제안사항들"],\n  "aiNotes": "전체적인 평가 및 코멘트"\n}`;
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          { parts: [ { text: prompt } ] }
+        ],
+        generationConfig: {
+          temperature: 0.3,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 1024,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API error: ${response.status} ${response.statusText} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!generatedText) throw new Error("No content generated from Gemini API");
+
+  // Extract JSON from the response
+  let jsonMatch = generatedText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("Could not extract JSON from Gemini response");
+  let cleanJsonText = jsonMatch[0];
+
+  // Try to parse
+  let parsed: GeminiValidationResult;
+  try {
+    parsed = JSON.parse(cleanJsonText);
+  } catch (err) {
+    throw new Error("Failed to parse Gemini validation JSON: " + err);
+  }
+  // 기본값 보정
+  return {
+    isValid: !!parsed.isValid,
+    score: typeof parsed.score === 'number' ? parsed.score : 0,
+    issues: Array.isArray(parsed.issues) ? parsed.issues : [],
+    suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
+    aiNotes: parsed.aiNotes || '',
+  };
+}// Gemini AI Provider
 import { AIProvider, GrammarQuestion, GRAMMAR_TYPE_MAPPING, DIFFICULTY_MAPPING } from './types'
 
 export class GeminiProvider implements AIProvider {
