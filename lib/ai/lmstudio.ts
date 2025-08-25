@@ -8,16 +8,18 @@ export class LMStudioProvider implements AIProvider {
   private lastModelCheck: number = 0
   private modelCheckInterval: number = 30000 // 30초마다 모델 확인
 
-  constructor(customModel?: string) {
-    const apiBase = process.env.LMSTUDIO_API_BASE
+  /**
+   * @param customModel Optional model name to use
+   * @param customApiBase Optional API base URL to use (user-supplied)
+   */
+  constructor(customModel?: string, customApiBase?: string) {
+    const apiBase = customApiBase || process.env.LMSTUDIO_API_BASE
     if (!apiBase) {
-      throw new Error("LMSTUDIO_API_BASE environment variable is not set")
+      throw new Error("LMSTUDIO_API_BASE environment variable is not set and no customApiBase provided")
     }
     this.apiBase = apiBase
-    
     // 우선순위: customModel > 전역 선택된 모델 > 환경변수 > 기본값
     this.modelName = customModel || getSelectedModel() || process.env.LMSTUDIO_MODEL_NAME || "local-model"
-    
     // 초기화 시 모델 감지 시도
     this.detectModel()
   }

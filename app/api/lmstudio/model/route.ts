@@ -4,20 +4,25 @@ import { setSelectedModel, getSelectedModel } from '@/lib/ai/model-state'
 export async function POST(request: NextRequest) {
   try {
     const { modelName } = await request.json()
-    
+    const { searchParams } = new URL(request.url)
+    const apiBase = searchParams.get('apiBase') || process.env.LMSTUDIO_API_BASE
+
     if (!modelName) {
       return NextResponse.json({ error: 'Model name is required' }, { status: 400 })
+    }
+    if (!apiBase) {
+      return NextResponse.json({ error: 'LM Studio API base URL is required' }, { status: 400 })
     }
 
     // 전역 모델 설정
     setSelectedModel(modelName)
-    
+
     return NextResponse.json({
       success: true,
       message: `LM Studio 모델이 ${modelName}으로 설정되었습니다`,
-      selectedModel: modelName
+      selectedModel: modelName,
+      localServer: apiBase
     })
-
   } catch (error) {
     console.error('Error setting LM Studio model:', error)
     return NextResponse.json({ 
@@ -29,8 +34,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const apiBase = process.env.LMSTUDIO_API_BASE
-    
+    const { searchParams } = new URL(request.url)
+    const apiBase = searchParams.get('apiBase') || process.env.LMSTUDIO_API_BASE
+
     if (!apiBase) {
       return NextResponse.json({ error: 'LM Studio not configured' }, { status: 400 })
     }
@@ -38,7 +44,7 @@ export async function GET(request: NextRequest) {
     // 현재 설정된 기본 모델
     const defaultModel = process.env.LMSTUDIO_MODEL_NAME || 'none'
     const selectedModel = getSelectedModel()
-    
+
     // 사용 가능한 모델 목록 조회
     const response = await fetch(`${apiBase}/models`, {
       signal: AbortSignal.timeout(5000)
@@ -49,7 +55,7 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json()
-    
+
     return NextResponse.json({
       success: true,
       defaultModel: defaultModel,
@@ -62,7 +68,6 @@ export async function GET(request: NextRequest) {
         object: model.object
       })) || []
     })
-
   } catch (error) {
     console.error('Error getting LM Studio model settings:', error)
     return NextResponse.json({ 

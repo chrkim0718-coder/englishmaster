@@ -381,6 +381,32 @@ export async function POST(request: NextRequest) {
     
 
     for (const question of questions) {
+      // 1. 문제에 빈칸이 없으면 자동 삭제
+      if (!question.question_text || !question.question_text.match(/_{2,}|____|\[\]/i)) {
+        await supabase.from("grammar_questions").delete().eq("id", question.id);
+        console.log(`🗑️ Deleted question (no blank): ${question.id}`);
+        continue;
+      }
+
+      // 2. 정답이 보기 중에 없으면 자동 삭제
+      const answer = question.correct_answer?.toUpperCase();
+      const options = [
+        question.option_a, question.option_b, question.option_c, question.option_d
+      ].map(opt => (opt || '').trim());
+      const answerIndex = ['A', 'B', 'C', 'D'].indexOf(answer);
+      if (answerIndex === -1 || !options[answerIndex] || options[answerIndex] === '') {
+        await supabase.from("grammar_questions").delete().eq("id", question.id);
+        console.log(`🗑️ Deleted question (invalid answer): ${question.id}`);
+        continue;
+      }
+
+      // 3. 해설에서 정답이 틀렸다고 언급된 경우 자동 삭제
+      if (question.explanation && /정답.?틀리|정답.?오류|정답.?잘못|wrong answer|incorrect answer|answer is wrong|answer is incorrect/i.test(question.explanation)) {
+        await supabase.from("grammar_questions").delete().eq("id", question.id);
+        console.log(`🗑️ Deleted question (explanation says answer is wrong): ${question.id}`);
+        continue;
+      }
+
       console.log(`🔍 Validating question: ${question.id}`)
       const result = await validateQuestionWithAI(question, lmstudioUrl, currentModel)
       validationResults.push(result)
