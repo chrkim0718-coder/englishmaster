@@ -207,6 +207,8 @@ export default function AdminDashboard() {
   const [lmstudioUrl, setLmstudioUrl] = useState("http://localhost:1234")
   const [lmstudioSettings, setLmstudioSettings] = useState<any>(null)
   const [aiValidationResults, setAiValidationResults] = useState<any[]>([])
+  const [needsFixResults, setNeedsFixResults] = useState<any[]>([])
+  const [showNeedsFixOnly, setShowNeedsFixOnly] = useState(false)
   const [aiValidationProgress, setAiValidationProgress] = useState({
     current: 0,
     total: 0,
@@ -215,6 +217,11 @@ export default function AdminDashboard() {
   })
   // 검증 모델 선택 상태
   const [validationModel, setValidationModel] = useState<'gemini' | 'lmstudio'>('gemini')
+
+  // 기존 검증 결과 불러올 때 needsFixResults도 갱신
+  useEffect(() => {
+    setNeedsFixResults(aiValidationResults.filter(r => !r.isValid || r.score < 70))
+  }, [aiValidationResults])
   
   const { toast } = useToast()
 
@@ -233,6 +240,7 @@ export default function AdminDashboard() {
     loadLMStudioSettings()
   }, [])
 
+
   useEffect(() => {
     if (activeTab === "users" || activeTab === "overview") {
       fetchUsers()
@@ -240,6 +248,14 @@ export default function AdminDashboard() {
       fetchQuestions()
     } else if (activeTab === "question-validation") {
       fetchValidationQuestions()
+      // 기존 AI 검증 결과도 불러와서 상태에 반영
+      fetch('/api/admin/ai-validation-results')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.results)) {
+            setAiValidationResults(data.results)
+          }
+        })
     } else if (activeTab === "duplicates") {
       fetchDuplicateQuestions()
     }
@@ -2385,9 +2401,22 @@ export default function AdminDashboard() {
               {/* AI Validation Results */}
               {aiValidationResults.length > 0 && (
                 <div className="border rounded-lg p-4 bg-green-50">
-                  <h4 className="font-medium text-green-800 mb-3">🎯 최근 AI 검증 결과</h4>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium text-green-800">🎯 최근 AI 검증 결과</h4>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant={showNeedsFixOnly ? "default" : "outline"}
+                        className="text-xs"
+                        onClick={() => setShowNeedsFixOnly(v => !v)}
+                      >
+                        {showNeedsFixOnly ? "전체 보기" : "수정 필요한 문제만"}
+                      </Button>
+                      <span className="text-xs text-gray-600">{showNeedsFixOnly ? `수정 필요: ${aiValidationResults.filter(r => !r.isValid || r.score < 70).length}개` : `전체: ${aiValidationResults.length}개`}</span>
+                    </div>
+                  </div>
                   <div className="space-y-3 max-h-60 overflow-y-auto">
-                    {aiValidationResults.map((result, index) => (
+                    {(showNeedsFixOnly ? needsFixResults : aiValidationResults).map((result, index) => (
                       <div key={index} className="bg-white p-3 rounded border">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-sm font-medium">문제 ID: {result.questionId}</span>

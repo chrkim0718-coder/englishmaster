@@ -305,6 +305,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      const needsFix = validationResults.filter(r => !r.isValid || r.score < 70)
       return NextResponse.json({
         success: true,
         validatedCount: validationResults.length,
@@ -312,6 +313,8 @@ export async function POST(request: NextRequest) {
         approvedCount: validationResults.filter(r => r.isValid && r.score >= 70).length,
         needsReviewCount: validationResults.filter(r => r.isValid && r.score < 70).length,
         results: validationResults,
+        needsFix,
+        needsFixCount: needsFix.length,
         message: `${validationResults.length}개 문제가 Gemini로 검증되었습니다.`
       })
     }
@@ -376,33 +379,63 @@ export async function POST(request: NextRequest) {
     let successCount = 0
     let failCount = 0
     
+
     for (const question of questions) {
       console.log(`🔍 Validating question: ${question.id}`)
       const result = await validateQuestionWithAI(question, lmstudioUrl, currentModel)
       validationResults.push(result)
-      
+
       if (result.score > 0) {
         successCount++
       } else {
         failCount++
       }
-      
-      // Update question with AI validation results (only if validation was successful)
-      if (result.score > 0) {
-        const validationStatus = result.isValid && result.score >= 70 ? "approved" : "needs_review"
-        const validationNotes = `AI 검증 점수: ${result.score}/100\n문제점: ${result.issues.join(", ")}\n제안사항: ${result.suggestions.join(", ")}\nAI 평가: ${result.aiNotes}`
 
-        await supabase
-          .from("grammar_questions")
-          .update({
-            is_validated: true,
-            validation_status: validationStatus,
-            validation_notes: validationNotes,
-            validated_by: user.id,
-            validated_at: new Date().toISOString()
-          })
-          .eq("id", question.id)
+      // 자동 수정 로직 (Gemini와 동일하게 suggestions 파싱)
+      let updateObj: any = {
+        is_validated: true,
+        validation_status: result.isValid && result.score >= 70 ? "approved" : "needs_review",
+        validation_notes: `AI 검증 점수: ${result.score}/100\n문제점: ${result.issues.join(", ")}\n제안사항: ${result.suggestions.join(", ")}\nAI 평가: ${result.aiNotes}`,
+        validated_by: user.id,
+        validated_at: new Date().toISOString()
+      };
+      let modifiedFields: string[] = [];
+      for (const s of result.suggestions || []) {
+        if (/보기|선택지|option/i.test(s)) {
+          const match = s.match(/A[.:-]?\s*([^,]+),?\s*B[.:-]?\s*([^,]+),?\s*C[.:-]?\s*([^,]+),?\s*D[.:-]?\s*([^,]+)/i);
+          if (match) {
+            updateObj.option_a = match[1].trim();
+            updateObj.option_b = match[2].trim();
+            updateObj.option_c = match[3].trim();
+            updateObj.option_d = match[4].trim();
+            modifiedFields.push('보기');
+          }
+        }
+        if (/정답|answer/i.test(s)) {
+          const match = s.match(/([A-D])/i);
+          if (match) {
+            updateObj.correct_answer = match[1].toUpperCase();
+            modifiedFields.push('정답');
+          }
+        }
+        if (/해설|설명|explanation/i.test(s)) {
+          const match = s.match(/해설[\s:：-]+(.+)/i) || s.match(/explanation[\s:：-]+(.+)/i);
+          if (match) {
+            updateObj.explanation = match[1].trim();
+            modifiedFields.push('해설');
+          } else {
+            updateObj.explanation = s.replace(/^(해설|설명|explanation)[\s:：-]*/i, '').trim();
+            modifiedFields.push('해설');
+          }
+        }
       }
+      if (modifiedFields.length > 0) {
+        updateObj.validation_notes += `\n[자동수정됨: ${modifiedFields.join(", ")}]`;
+      }
+      await supabase
+        .from("grammar_questions")
+        .update(updateObj)
+        .eq("id", question.id);
     }
 
     const approvedCount = validationResults.filter(r => r.isValid && r.score >= 70).length
@@ -416,6 +449,7 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
+    const needsFix = validationResults.filter(r => !r.isValid || r.score < 70)
     return NextResponse.json({
       success: true,
       validatedCount: successCount,
@@ -423,6 +457,8 @@ export async function POST(request: NextRequest) {
       approvedCount,
       needsReviewCount,
       results: validationResults,
+      needsFix,
+      needsFixCount: needsFix.length,
       message: failCount > 0 ? `${successCount}/${validationResults.length}개 문제가 성공적으로 검증되었습니다.` : undefined
     })
 

@@ -196,11 +196,50 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Filter weak areas to only include types with actual incorrect answers
-    const weakAreas = Object.values(grammarTypeStats)
-      .filter((area: any) => incorrectQuestionGrammarTypes.has(area.grammar_type))
-      .sort((a: any, b: any) => a.average_score - b.average_score)
-      .slice(0, 3)
+
+    // user_answers 기반으로 취약 유형 집계 (틀린 문제의 grammar_type별로 개수/정답률 등 계산)
+    let weakAreas: any[] = [];
+    if (currentlyIncorrectQuestions.length > 0) {
+      // grammar_questions에서 틀린 문제의 grammar_type, id, 등 추가 정보 조회
+      const { data: incorrectQuestions } = await serviceSupabase
+        .from("grammar_questions")
+        .select("id, grammar_type, question_text")
+        .in("id", currentlyIncorrectQuestions);
+
+      // 한글 매핑
+      const englishToKorean: Record<string, string> = {
+        "Present Simple": "현재시제",
+        "Present Perfect": "현재완료",
+        "Past Simple": "과거시제",
+        "Past Perfect": "과거완료",
+        "Future Tense": "미래시제",
+        "Conditionals": "가정법",
+        "Passive Voice": "수동태",
+        "Modal Verbs": "조동사",
+        "Gerunds and Infinitives": "동명사/부정사",
+        "Gerunds": "동명사",
+        "Infinitives": "부정사",
+        "Participles": "분사",
+        "Articles": "관사",
+        "Prepositions": "전치사",
+        "Relative Clauses": "관계사",
+        "Conjunctions": "접속사",
+        "Tenses": "시제",
+      };
+
+      // grammar_type별로 그룹핑 및 개수 집계
+      const weakMap: Record<string, { grammar_type: string, total_questions: number, average_score: number }> = {};
+      for (const q of incorrectQuestions || []) {
+        const koType = englishToKorean[q.grammar_type] || q.grammar_type;
+        if (!weakMap[koType]) {
+          weakMap[koType] = { grammar_type: koType, total_questions: 1, average_score: 0 };
+        } else {
+          weakMap[koType].total_questions += 1;
+        }
+      }
+      // 평균 점수는 0(틀린 문제만 집계)로 표시
+      weakAreas = Object.values(weakMap);
+    }
 
     // Get recent progress (last 10 sessions) with Korean grammar type names
     const recentProgress = sessions.slice(0, 10).map((session: any) => {

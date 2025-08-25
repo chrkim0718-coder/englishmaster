@@ -180,6 +180,22 @@ export default function PerformanceDashboard({ onBack, onStartWeaknessQuiz, onRe
     return map[type] || type
   }
 
+  // weakAreas 한글/영문 병합 유틸
+  const mergeWeakAreasByKoreanType = (weakAreas: any[]) => {
+    const merged: Record<string, any> = {};
+    for (const area of weakAreas) {
+      const koType = grammarTypeKo(area.grammar_type);
+      if (!merged[koType]) {
+        merged[koType] = { ...area, grammar_type: koType };
+      } else {
+        // 점수, 문제수 등 합산/최대치 등 필요시 조정
+        merged[koType].average_score = Math.min(merged[koType].average_score, area.average_score);
+        merged[koType].total_questions += area.total_questions;
+      }
+    }
+    return Object.values(merged);
+  };
+
   // Simple Chart Component
   const SimpleChart = ({ data }: { data: ChartData[] }) => {
     if (!data || data.length === 0) {
@@ -707,7 +723,7 @@ export default function PerformanceDashboard({ onBack, onStartWeaknessQuiz, onRe
           </Card>
 
           {/* Weak Areas */}
-          {stats.weakAreas.length > 0 ? (
+          {mergeWeakAreasByKoreanType(stats.weakAreas).length > 0 ? (
             <Card className="border-orange-200">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -718,11 +734,11 @@ export default function PerformanceDashboard({ onBack, onStartWeaknessQuiz, onRe
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {stats.weakAreas.map((area) => (
+                  {mergeWeakAreasByKoreanType(stats.weakAreas).map((area: any) => (
                     <Card key={area.grammar_type} className="border-orange-200">
                       <CardContent className="pt-4">
                         <div className="text-center space-y-2">
-                          <h4 className="font-medium">{grammarTypeKo(area.grammar_type)}</h4>
+                          <h4 className="font-medium">{area.grammar_type}</h4>
                           <div className="text-2xl font-bold text-orange-600">{area.average_score}%</div>
                           <p className="text-sm text-gray-600">{area.total_questions}문제 시도</p>
                           <div className="space-y-2">
@@ -738,9 +754,7 @@ export default function PerformanceDashboard({ onBack, onStartWeaknessQuiz, onRe
                                   e.preventDefault()
                                   e.stopPropagation()
                                   console.log('🔄 Button clicked for:', area.grammar_type)
-                                  const koreanType = grammarTypeKo(area.grammar_type)
-                                  console.log('🔄 Korean type:', koreanType)
-                                  onStartWeaknessQuiz(koreanType)
+                                  onStartWeaknessQuiz(area.grammar_type)
                                 }}
                               >
                                 틀린 문제 풀어보기
