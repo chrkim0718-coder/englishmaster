@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,7 +22,7 @@ export function UpdatePasswordForm() {
   // 컴포넌트 마운트 시 세션 확인
   useEffect(() => {
     const checkSession = async () => {
-      const supabase = createClient()
+  // supabase already imported as singleton
       const { data: { session }, error } = await supabase.auth.getSession()
       
       console.log("� Session check:", { session: !!session, error })
@@ -72,7 +72,7 @@ export function UpdatePasswordForm() {
     }
 
     try {
-      const supabase = createClient()
+  // supabase already imported as singleton
       
       // 비밀번호 업데이트
       const { error } = await supabase.auth.updateUser({

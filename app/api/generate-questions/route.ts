@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { generateGrammarQuestions } from "@/lib/ai"
+import type { GrammarQuestion } from "@/lib/ai/types"
 import { createServiceClient } from "@/lib/supabase/service"
 import { REVERSE_DIFFICULTY_MAPPING } from "@/lib/ai/types"
 
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
         .in("question_text", texts)
       const existingTexts = (existing || []).map(q => q.question_text)
       // Filter out duplicates (already in DB or in this batch)
-      const newUniques = questions.filter(q =>
+  const newUniques: GrammarQuestion[] = questions.filter(q =>
         !existingTexts.includes(q.question_text) &&
         !uniqueQuestions.some(uq => uq.question_text === q.question_text)
       )

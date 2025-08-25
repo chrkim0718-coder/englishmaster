@@ -17,16 +17,21 @@ interface AdminStats {
   totalUsers: number
   totalQuestions: number
   totalSessions: number
-  grammarTypeStats: Record<string, number>
-  difficultyStats: Record<string, number>
+  grammarTypeStats: Record<string, number | {
+    total: number;
+    beginner: number;
+    intermediate: number;
+    advanced: number;
+  }>;
+  difficultyStats: Record<string, number>;
   recentActivity: Array<{
-    id: string
-    score_percentage: number
-    grammar_type: string
-    difficulty_level: string
-    completed_at: string
-    user_profiles: { email: string }
-  }>
+    id: string;
+    score_percentage: number;
+    grammar_type: string;
+    difficulty_level: string;
+    completed_at: string;
+    user_profiles: { email: string };
+  }>;
 }
 
 interface User {
@@ -56,10 +61,14 @@ interface Question {
 }
 
 interface ValidationResult {
-  category: string
-  severity: 'error' | 'warning' | 'info'
-  message: string
-  data?: any
+  id?: string;
+  question_text?: string;
+  grammar_type?: string;
+  explanation?: string;
+  category: string;
+  severity: 'error' | 'warning' | 'info';
+  message: string;
+  data?: any;
 }
 
 interface ValidationSummary {
@@ -1317,21 +1326,22 @@ export default function AdminDashboard() {
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {Object.entries(stats?.grammarTypeStats || {}).map(([type, count]) => {
-                  const details = stats?.grammarTypeStats?.[type]
+                  const details = stats?.grammarTypeStats?.[type];
+                  const isDetailsObject = details && typeof details === 'object' && !Array.isArray(details);
                   return (
                     <div key={type} className="text-center p-4 bg-gray-50 rounded-lg">
-                      <p className="text-2xl font-bold text-blue-600">{count}</p>
+                      <p className="text-2xl font-bold text-blue-600">{typeof count === 'number' ? count : ''}</p>
                       <p className="text-sm font-medium text-gray-800 mb-2">{getKoreanGrammarType(type)}</p>
-                      {details && (
+                      {isDetailsObject && (
                         <div className="flex flex-wrap gap-1 justify-center">
                           <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">
-                            초 {details.beginner}
+                            초 {details.beginner ?? ''}
                           </span>
                           <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs">
-                            중 {details.intermediate}
+                            중 {details.intermediate ?? ''}
                           </span>
                           <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">
-                            고 {details.advanced}
+                            고 {details.advanced ?? ''}
                           </span>
                         </div>
                       )}
@@ -1700,27 +1710,27 @@ export default function AdminDashboard() {
                       </CardHeader>
                       <CardContent className="space-y-4">
                         {validationResults.map((issue, idx) => (
-                          <div key={issue.id || idx} className="p-3 bg-white rounded-lg border mb-2">
+                          <div key={issue.id ?? idx} className="p-3 bg-white rounded-lg border mb-2">
                             <div className="mb-1 text-sm text-gray-700">
                               <b>문제:</b> {issue.question_text || issue.message}
                             </div>
                             <div className="mb-2 text-xs text-gray-500">{issue.category} / {issue.severity}</div>
                             {/* 누락 필드 자동채움 */}
                             {issue.category === 'Data Integrity' && (
-                              <Button size="sm" variant="outline" onClick={() => handleAutoFillQuestion(issue.id)}>
+                              <Button size="sm" variant="outline" onClick={() => handleAutoFillQuestion(issue.id ?? '')}>
                                 자동채움
                               </Button>
                             )}
                             {/* 문법유형 오류/미지정 */}
                             {issue.category === 'Grammar Type Validation' && (
                               <div className="flex gap-2 items-center">
-                                <select value={issue.grammar_type || ''} onChange={e => handleFixGrammarType(issue.id, e.target.value)} className="border rounded px-2 py-1">
+                                <select value={issue.grammar_type || ''} onChange={e => handleFixGrammarType(issue.id ?? '', e.target.value)} className="border rounded px-2 py-1">
                                   <option value="">문법유형 선택</option>
                                   {Object.keys(REVERSE_GRAMMAR_TYPE_MAPPING).map(type => (
                                     <option key={type} value={type}>{getKoreanGrammarType(type)}</option>
                                   ))}
                                 </select>
-                                <Button size="sm" onClick={() => handleFixGrammarType(issue.id, issue.grammar_type)}>
+                                <Button size="sm" onClick={() => handleFixGrammarType(issue.id ?? '', issue.grammar_type ?? '')}>
                                   수정
                                 </Button>
                               </div>
@@ -1728,20 +1738,20 @@ export default function AdminDashboard() {
                             {/* 설명 너무 짧음 */}
                             {issue.category === 'Explanation Quality' && (
                               <div className="flex gap-2 items-center">
-                                <input type="text" className="border rounded px-2 py-1 flex-1" value={issue.explanation || ''} onChange={e => handleFixExplanation(issue.id, e.target.value)} />
-                                <Button size="sm" onClick={() => handleFixExplanation(issue.id, issue.explanation)}>
+                                <input type="text" className="border rounded px-2 py-1 flex-1" value={issue.explanation || ''} onChange={e => handleFixExplanation(issue.id ?? '', e.target.value)} />
+                                <Button size="sm" onClick={() => handleFixExplanation(issue.id ?? '', issue.explanation ?? '')}>
                                   설명 수정
                                 </Button>
                               </div>
                             )}
                             {/* 옵션 중복/누락 자동채움 */}
                             {issue.category === 'Option Validation' && (
-                              <Button size="sm" variant="outline" onClick={() => handleAutoFillOptions(issue.id)}>
+                              <Button size="sm" variant="outline" onClick={() => handleAutoFillOptions(issue.id ?? '')}>
                                 옵션 자동채움
                               </Button>
                             )}
                             {/* 즉시 삭제 */}
-                            <Button size="sm" variant="destructive" className="ml-2" onClick={() => handleDeleteQuestion(issue.id)}>
+                            <Button size="sm" variant="destructive" className="ml-2" onClick={() => handleDeleteQuestion(issue.id ?? '')}>
                               삭제
                             </Button>
                           </div>
