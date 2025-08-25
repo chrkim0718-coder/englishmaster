@@ -69,7 +69,7 @@ export async function runGeminiValidationAndAutoFix(supabase: any, questionId: s
   // 60점 이상이거나 수정할 내용 없음
   return { success: true };
 }
-import type { GrammarQuestion } from "../gemini";
+// Removed duplicate GrammarQuestion import
 
 export interface GeminiValidationResult {
   isValid: boolean;
@@ -155,6 +155,8 @@ export class GeminiProvider implements AIProvider {
     const prompt = `너는 G-TELP 문법 출제자야. [문법유형: ${grammarType}], [난이도: ${difficultyLevel}]에 맞는 4지선다형 영어 문법 문제를 ${count}문항 만들어줘. 
 
 문장은 빈칸이 한 곳 있으며, 보기 4개와 정답, 간단한 해설도 함께 제공해줘. 
+
+중요: 반드시 "이미 존재하는 문제와 중복되지 않게" 새로운 문제를 만들어야 해. 기존에 출제된 문제와 동일하거나 유사한 문장은 절대 사용하지 마. (예: 'She _____ to school every day.' 등 흔한 예시는 금지)
 
 출력 형식은 아래와 같아:
 문제: (빈칸이 있는 영어 문장)

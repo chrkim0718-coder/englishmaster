@@ -1,3 +1,7 @@
+// 문법유형에서 괄호 및 괄호 안 세부 설명 제거 (대분류만 반환)
+export function normalizeGrammarType(type: string): string {
+  return type.split('(')[0].trim();
+}
 // Common types and interfaces for all AI providers
 export interface GrammarQuestion {
   question_text: string

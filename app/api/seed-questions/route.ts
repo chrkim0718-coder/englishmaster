@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createApiClient } from "@/lib/supabase/server"
 
+import { normalizeGrammarType } from "@/lib/ai/types"
 const sampleQuestions = [
   // 가정법 (Conditionals) - Beginner
   {
@@ -11,7 +12,7 @@ const sampleQuestions = [
     option_d: 'will rain',
     correct_answer: 'B',
     explanation: 'In first conditional, use present simple in the if-clause.',
-    grammar_type: 'Conditionals',
+  grammar_type: normalizeGrammarType('Conditionals'),
     difficulty_level: 'beginner'
   },
   {
@@ -22,7 +23,7 @@ const sampleQuestions = [
     option_d: 'must',
     correct_answer: 'A',
     explanation: 'In first conditional, use "will" in the main clause.',
-    grammar_type: 'Conditionals',
+  grammar_type: normalizeGrammarType('Conditionals'),
     difficulty_level: 'beginner'
   },
   {
@@ -33,7 +34,7 @@ const sampleQuestions = [
     option_d: 'will leave', 
     correct_answer: 'A',
     explanation: 'In zero conditional, use present simple in both clauses.',
-    grammar_type: 'Conditionals',
+  grammar_type: normalizeGrammarType('Conditionals'),
     difficulty_level: 'beginner'
   },
   
@@ -46,7 +47,7 @@ const sampleQuestions = [
     option_d: 'must have',
     correct_answer: 'B',
     explanation: 'Third conditional with inverted structure uses "would have" + past participle.',
-    grammar_type: 'Conditionals', 
+  grammar_type: normalizeGrammarType('Conditionals'),
     difficulty_level: 'advanced'
   },
   
@@ -59,7 +60,7 @@ const sampleQuestions = [
     option_d: 'might',
     correct_answer: 'A',
     explanation: 'Use "should" for advice and recommendations.',
-    grammar_type: 'Modal Verbs',
+  grammar_type: normalizeGrammarType('Modal Verbs'),
     difficulty_level: 'beginner'
   },
   {
@@ -70,7 +71,7 @@ const sampleQuestions = [
     option_d: 'Will',
     correct_answer: 'B',
     explanation: 'Use "May" for polite permission requests.',
-    grammar_type: 'Modal Verbs',
+  grammar_type: normalizeGrammarType('Modal Verbs'),
     difficulty_level: 'beginner'
   }
 ]

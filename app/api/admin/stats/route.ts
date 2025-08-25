@@ -88,14 +88,18 @@ export async function GET(request: NextRequest) {
           }
         }
         grammarTypeDetailedStats[q.grammar_type].total++
-        
-        if (q.difficulty_level === 'beginner') {
+        if (q.difficulty_level === 'beginner' || q.difficulty_level === '초급') {
           grammarTypeDetailedStats[q.grammar_type].beginner++
-        } else if (q.difficulty_level === 'intermediate') {
+        } else if (q.difficulty_level === 'intermediate' || q.difficulty_level === '중급') {
           grammarTypeDetailedStats[q.grammar_type].intermediate++
-        } else if (q.difficulty_level === 'advanced') {
+        } else if (q.difficulty_level === 'advanced' || q.difficulty_level === '고급') {
           grammarTypeDetailedStats[q.grammar_type].advanced++
         }
+      })
+      // 로그 추가: 각 문법유형별 난이도별 개수 출력
+      console.log('문법유형별 난이도별 개수 (grammarTypeDetailedStats):')
+      Object.entries(grammarTypeDetailedStats).forEach(([type, detail]) => {
+        console.log(`- ${type}:`, detail)
       })
     }
 

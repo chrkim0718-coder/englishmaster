@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle single grammar type generation (existing logic)
+    const { normalizeGrammarType } = await import("@/lib/ai/types")
     const { grammarType, difficultyLevel, count = 5 } = body
 
     // Validate input
@@ -32,31 +33,58 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid difficulty level" }, { status: 400 })
     }
 
-    // Generate questions using selected AI provider
-    console.log("Generating questions with:", { grammarType, difficultyLevel: koreanDifficulty, count, aiProvider: body.aiProvider })
-    const questions = await generateGrammarQuestions(grammarType, koreanDifficulty, count, body.aiProvider)
+    // 문법유형 대분류만 사용
+    const mainType = normalizeGrammarType(grammarType)
 
-    // Add delay for individual generation to prevent rate limiting (Gemini는 3초)
-    if (body.aiProvider === 'gemini' || !body.aiProvider) {
-      console.log("⏳ Adding 3 seconds delay for Gemini to prevent rate limiting...")
-      await new Promise(resolve => setTimeout(resolve, 3000))
-    } else {
-      console.log("⏳ Adding 1 second delay to prevent rate limiting...")
-      await new Promise(resolve => setTimeout(resolve, 1000))
-    }
-
+    // Generate questions using selected AI provider, filter duplicates, and retry if needed
+    console.log("Generating questions with:", { grammarType: mainType, difficultyLevel: koreanDifficulty, count, aiProvider: body.aiProvider })
     const supabase = createServiceClient()
-    const { data, error } = await supabase.from("grammar_questions").insert(questions).select()
-
+    let uniqueQuestions = []
+    let attempts = 0
+    const maxAttempts = 3
+    let totalGenerated = 0
+    while (uniqueQuestions.length < count && attempts < maxAttempts) {
+      const needed = count - uniqueQuestions.length
+      const questions = await generateGrammarQuestions(mainType, koreanDifficulty, needed, body.aiProvider)
+      totalGenerated += questions.length
+      // Check for duplicates in DB
+      const texts = questions.map(q => q.question_text)
+      const { data: existing, error: fetchError } = await supabase
+        .from("grammar_questions")
+        .select("question_text")
+        .in("question_text", texts)
+      const existingTexts = (existing || []).map(q => q.question_text)
+      // Filter out duplicates (already in DB or in this batch)
+      const newUniques = questions.filter(q =>
+        !existingTexts.includes(q.question_text) &&
+        !uniqueQuestions.some(uq => uq.question_text === q.question_text)
+      )
+      uniqueQuestions.push(...newUniques)
+      attempts++
+      // Add delay for rate limiting
+      if (body.aiProvider === 'gemini' || !body.aiProvider) {
+        await new Promise(resolve => setTimeout(resolve, 3000))
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1000))
+      }
+    }
+    if (uniqueQuestions.length === 0) {
+      return NextResponse.json({ error: "No unique questions could be generated after several attempts." }, { status: 400 })
+    }
+    // DB 저장 직전 모든 문제의 grammar_type을 강제 정제
+    const normalizedQuestions = uniqueQuestions.map(q => ({ ...q, grammar_type: normalizeGrammarType(q.grammar_type) }))
+    const { data, error } = await supabase.from("grammar_questions").insert(normalizedQuestions).select()
     if (error) {
       console.error("Database error:", error)
       return NextResponse.json({ error: "Failed to save questions to database" }, { status: 500 })
     }
-
     return NextResponse.json({
       success: true,
       questions: data,
       count: data?.length || 0,
+      totalGenerated,
+      uniqueSaved: uniqueQuestions.length,
+      attempts
     })
   } catch (error) {
     console.error("Error in generate-questions API:", error)
@@ -138,19 +166,54 @@ async function handleBatchGeneration(body: any) {
       }, { status: 500 })
     }
 
-    // Save all questions to database
-    const supabase = createServiceClient()
-    const { data, error } = await supabase.from("grammar_questions").insert(allQuestions).select()
 
-    if (error) {
-      console.error("Database error:", error)
-      return NextResponse.json({ error: "Failed to save questions to database" }, { status: 500 })
+    // Filter out any questions with missing/null/empty grammar_type or options
+    const validQuestions = allQuestions.filter(q =>
+      q.grammar_type && q.grammar_type !== null && q.grammar_type !== undefined && q.grammar_type !== '' &&
+      q.option_a && q.option_b && q.option_c && q.option_d &&
+      q.correct_answer && q.explanation && q.question_text
+    )
+    if (validQuestions.length !== allQuestions.length) {
+      console.warn(`Filtered out ${allQuestions.length - validQuestions.length} invalid questions with missing fields.`)
+    }
+
+    const supabase = createServiceClient()
+    const insertedQuestions = []
+    const skippedQuestions = []
+    for (const q of validQuestions) {
+      // Check for duplicate question_text
+      const { data: existing, error: fetchError } = await supabase
+        .from("grammar_questions")
+        .select("id")
+        .eq("question_text", q.question_text)
+        .maybeSingle()
+      if (fetchError) {
+        console.warn("DB fetch error for duplicate check:", fetchError)
+        skippedQuestions.push({ ...q, reason: 'fetch_error' })
+        continue
+      }
+      if (existing) {
+        skippedQuestions.push({ ...q, reason: 'duplicate' })
+        continue
+      }
+      // Try insert
+      const { data: inserted, error: insertError } = await supabase.from("grammar_questions").insert(q).select()
+      if (insertError) {
+        console.warn("Insert error for question:", insertError, q)
+        skippedQuestions.push({ ...q, reason: 'insert_error', error: insertError })
+        continue
+      }
+      if (inserted && inserted.length > 0) {
+        insertedQuestions.push(inserted[0])
+      }
     }
 
     return NextResponse.json({
       success: true,
-      questions: data,
-      totalCount: data?.length || 0,
+      questions: insertedQuestions,
+      totalCount: insertedQuestions.length,
+      skippedCount: skippedQuestions.length,
+      skippedQuestions,
       successCount,
       failureCount,
       totalTypes: grammarTypes.length,

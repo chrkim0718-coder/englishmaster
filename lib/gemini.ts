@@ -20,12 +20,15 @@ export async function generateGrammarQuestions(
 ): Promise<GrammarQuestion[]> {
   const aiProvider = process.env.AI_PROVIDER || 'gemini'
   
+  // 항상 대분류만 사용
+  const { normalizeGrammarType } = await import("@/lib/ai/types")
+  const mainType = normalizeGrammarType(grammarType)
   if (aiProvider === 'grok') {
-    return generateWithGrok(grammarType, difficultyLevel, count)
+    return generateWithGrok(mainType, difficultyLevel, count)
   } else if (aiProvider === 'lmstudio') {
-    return generateWithLMStudio(grammarType, difficultyLevel, count)
+    return generateWithLMStudio(mainType, difficultyLevel, count)
   } else {
-    return generateWithGemini(grammarType, difficultyLevel, count)
+    return generateWithGemini(mainType, difficultyLevel, count)
   }
 }
 

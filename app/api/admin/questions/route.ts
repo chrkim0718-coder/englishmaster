@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false })
       .range((page - 1) * limit, page * limit - 1)
 
-    if (grammarType) {
+    if (grammarType && grammarType !== "all") {
       query = query.eq("grammar_type", grammarType)
     }
     if (difficultyLevel) {

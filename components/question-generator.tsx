@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, Plus, CheckCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { GRAMMAR_TYPES } from "@/lib/ai/types"
+import { GRAMMAR_TYPES, normalizeGrammarType } from "@/lib/ai/types"
 
 interface GeneratedQuestion {
   id: string
@@ -35,8 +35,8 @@ export default function QuestionGenerator() {
   const [aiProvider, setAiProvider] = useState("gemini")
   const { toast } = useToast()
 
-  // 공통 문법유형 사용
-  const grammarTypes = [...GRAMMAR_TYPES]
+  // 공통 문법유형 사용 ("랜덤" 제외)
+  const grammarTypes = GRAMMAR_TYPES.filter(type => type !== "랜덤")
 
   // 행 추가
   const handleAddRow = () => {
@@ -48,8 +48,13 @@ export default function QuestionGenerator() {
     setRows((prev) => prev.length === 1 ? prev : prev.filter((_, i) => i !== idx))
   }
 
-  // 행 값 변경
+  // 행 값 변경 (문법유형은 항상 대분류만 저장)
   const handleRowChange = (idx: number, key: string, value: string | number) => {
+    if (key === "grammarType") {
+      // @ts-ignore
+      const { normalizeGrammarType } = require("@/lib/ai/types")
+      value = normalizeGrammarType(value as string)
+    }
     setRows((prev) => prev.map((row, i) => i === idx ? { ...row, [key]: value } : row))
   }
 
@@ -299,7 +304,7 @@ export default function QuestionGenerator() {
                   <div className="flex justify-between items-start">
                     <h4 className="font-medium text-lg">문제 {index + 1}</h4>
                     <div className="flex gap-2 text-sm text-muted-foreground">
-                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">{question.grammar_type}</span>
+                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">{normalizeGrammarType(question.grammar_type)}</span>
                       <span className="bg-green-100 text-green-800 px-2 py-1 rounded capitalize">
                         {question.difficulty_level}
                       </span>

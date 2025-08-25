@@ -4,7 +4,9 @@ import { createClient } from "@supabase/supabase-js"
 
 export async function POST(request: NextRequest) {
   try {
-    const { grammarType, difficultyLevel, questions, answers, score } = await request.json()
+  const { normalizeGrammarType } = await import("@/lib/ai/types")
+  let { grammarType, difficultyLevel, questions, answers, score } = await request.json()
+  grammarType = normalizeGrammarType(grammarType)
 
     const supabase = await createApiClient()
     

@@ -24,6 +24,7 @@ export class GrokProvider implements AIProvider {
 - 난이도: ${difficultyLevel}
 - 객관식 4지선다 문제
 - 한국어 설명 포함
+- 반드시 "이미 존재하는 문제와 중복되지 않게" 새로운 문제를 만들어야 합니다. 기존에 출제된 문제와 동일하거나 유사한 문장은 절대 사용하지 마세요.
 
 반드시 JSON 형식으로만 응답해주세요:
 [
