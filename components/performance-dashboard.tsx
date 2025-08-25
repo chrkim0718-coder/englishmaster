@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from "recharts"
 import { TrendingUp, Target, AlertTriangle, BarChart3, ArrowLeft, X, Calendar } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
@@ -64,6 +65,7 @@ interface PerformanceDashboardProps {
 }
 
 export default function PerformanceDashboard({ onBack, onStartWeaknessQuiz, onRefresh }: PerformanceDashboardProps) {
+  const [showRadarChart, setShowRadarChart] = useState(false)
   const [stats, setStats] = useState<PerformanceStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showChart, setShowChart] = useState(false)
@@ -677,48 +679,63 @@ export default function PerformanceDashboard({ onBack, onStartWeaknessQuiz, onRe
 
           {/* Performance by Grammar Type */}
           <Card>
-            <CardHeader>
-              <CardTitle>문법유형별 성취도</CardTitle>
-              <CardDescription>문법유형별 정답률</CardDescription>
+            <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between">
+              <div>
+                <CardTitle>문법유형별 성취도</CardTitle>
+                <CardDescription>문법유형별 정답률</CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowRadarChart((prev) => !prev)}
+                className="mt-2 md:mt-0"
+              >
+                {showRadarChart ? "표로 보기" : "방사형 차트로 보기"}
+              </Button>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {stats.grammarTypeStats.map((stat) => (
-                  <div key={stat.grammar_type} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">{stat.grammar_type}</span>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => fetchChartData(stat.grammar_type)}
-                          disabled={isLoadingChart}
-                          className="text-blue-600 hover:text-blue-700"
-                        >
-                          <BarChart3 className="h-4 w-4 mr-1" />
-                          {isLoadingChart ? "로딩..." : "그래프"}
-                        </Button>
-                        <span className="text-sm text-gray-600">
-                          {stat.correct_answers}/{stat.total_questions}
-                        </span>
-                        <Badge
-                          variant="secondary"
-                          className={
-                            stat.average_score >= 80
-                              ? "bg-green-100 text-green-800"
-                              : stat.average_score >= 60
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-red-100 text-red-800"
-                          }
-                        >
-                          {stat.average_score}%
-                        </Badge>
+              {showRadarChart ? (
+                <div className="w-full h-96">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart cx="50%" cy="50%" outerRadius="80%" data={stats.grammarTypeStats.map(stat => ({ category: stat.grammar_type, score: stat.average_score }))}>
+                      <PolarGrid />
+                      <PolarAngleAxis dataKey="category" />
+                      <PolarRadiusAxis angle={30} domain={[0, 100]} />
+                      <Radar name="성취도" dataKey="score" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
+                      <Tooltip />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                  <div className="text-xs text-gray-500 mt-2 text-center">* 각 문법 유형별 성취도(점수) 비교</div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {stats.grammarTypeStats.map((stat) => (
+                    <div key={stat.grammar_type} className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">{stat.grammar_type}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-600">
+                            {stat.correct_answers}/{stat.total_questions}
+                          </span>
+                          <Badge
+                            variant="secondary"
+                            className={
+                              stat.average_score >= 80
+                                ? "bg-green-100 text-green-800"
+                                : stat.average_score >= 60
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-red-100 text-red-800"
+                            }
+                          >
+                            {stat.average_score}%
+                          </Badge>
+                        </div>
                       </div>
+                      <Progress value={stat.average_score} className="h-2" />
                     </div>
-                    <Progress value={stat.average_score} className="h-2" />
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 

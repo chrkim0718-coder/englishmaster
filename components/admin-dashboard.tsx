@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from "recharts"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -79,6 +80,7 @@ interface ValidationSummary {
 }
 
 export default function AdminDashboard() {
+  const [showRadarChart, setShowRadarChart] = useState(false)
   // 문제 데이터 이슈별 조치 핸들러들
   async function handleAutoFillQuestion(id: string) {
     // 예시: 모든 빈 옵션을 'N/A'로 채움
@@ -1646,18 +1648,42 @@ export default function AdminDashboard() {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 데이터 관리
-                <Button 
-                  onClick={handleCheckData}
-                  disabled={isCheckingData}
-                  className="flex items-center gap-2"
-                >
-                  {isCheckingData ? "확인 중..." : "데이터 확인"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleCheckData}
+                    disabled={isCheckingData}
+                    className="flex items-center gap-2"
+                  >
+                    {isCheckingData ? "확인 중..." : "데이터 확인"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2"
+                    onClick={() => setShowRadarChart((prev) => !prev)}
+                  >
+                    {showRadarChart ? "표로 보기" : "성취도 방사형으로 보기"}
+                  </Button>
+                </div>
               </CardTitle>
               <CardDescription>기존 퀴즈 세션 데이터를 확인하고 수정하세요</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {dataAnalysis && (
+              {showRadarChart && dataAnalysis ? (
+                <div className="bg-white rounded-lg p-6 shadow border">
+                  <div className="text-center text-lg font-bold mb-2">성취도 방사형 차트</div>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <RadarChart cx="50%" cy="50%" outerRadius="80%" data={dataAnalysis.radarData || []}>
+                      <PolarGrid />
+                      <PolarAngleAxis dataKey="category" />
+                      <PolarRadiusAxis angle={30} domain={[0, 100]} />
+                      <Radar name="성취도" dataKey="score" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
+                      <Tooltip />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                  <div className="text-xs text-gray-500 mt-2">* 각 문법 유형별 성취도(점수) 비교</div>
+                </div>
+              ) : null}
+              {dataAnalysis && !showRadarChart && (
                 <div className="space-y-6">
                   {/* Data Analysis Results */}
                   <Card className="bg-blue-50 border-blue-200">
