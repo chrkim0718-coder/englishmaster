@@ -25,6 +25,7 @@ export function LMStudioModelSelector() {
   const [settings, setSettings] = useState<ModelSettings | null>(null)
   const [selectedModel, setSelectedModel] = useState<string>('')
   const [apiBase, setApiBase] = useState<string>('')
+  const [envApiBase, setEnvApiBase] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const { toast } = useToast()
@@ -43,8 +44,11 @@ export function LMStudioModelSelector() {
         setSettings(data)
         setSelectedModel(data.selectedModel || data.currentModel || data.defaultModel)
         if (data.localServer) {
-          setApiBase(data.localServer)
-          localStorage.setItem('lmstudioApiBase', data.localServer)
+          setEnvApiBase(data.localServer)
+          // input이 비어있을 때만 .env 값을 기본값으로 사용
+          if (!localStorage.getItem('lmstudioApiBase')) {
+            setApiBase('')
+          }
         }
       }
     } catch (error) {
@@ -147,7 +151,7 @@ export function LMStudioModelSelector() {
               setApiBase(e.target.value)
               localStorage.setItem('lmstudioApiBase', e.target.value)
             }}
-            placeholder="예: http://localhost:1234"
+            placeholder={envApiBase || "예: http://localhost:1234"}
             disabled={updating}
           />
           <Button
