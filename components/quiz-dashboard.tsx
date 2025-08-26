@@ -24,7 +24,7 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
   const [selectedGrammarType, setSelectedGrammarType] = useState("")
   const [selectedDifficulty, setSelectedDifficulty] = useState("")
   const [selectedQuestionCount, setSelectedQuestionCount] = useState("")
-  const [selectedScoringMode, setSelectedScoringMode] = useState("end") // "end" or "immediate"
+  const [selectedScoringMode, setSelectedScoringMode] = useState("immediate") // "end" or "immediate"
   const [availableQuestionCount, setAvailableQuestionCount] = useState(0)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [generateCount, setGenerateCount] = useState("5")
