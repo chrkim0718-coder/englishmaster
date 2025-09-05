@@ -1,4 +1,26 @@
 "use client"
+import emailjs from '@emailjs/browser'
+async function handleSendTempPassword(email: string) {
+  const tempPassword = Math.random().toString(36).slice(-8)
+  const templateParams = {
+    to_email: email,
+    temp_password: tempPassword,
+  }
+  console.log('[임시비밀번호 발송 시도]', templateParams)
+  try {
+    const result = await emailjs.send(
+      process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID!,
+      process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID!,
+      templateParams,
+      process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY!
+    )
+    console.log('[임시비밀번호 발송 성공]', result)
+    alert('임시 비밀번호가 발송되었습니다.')
+  } catch (error) {
+    console.error('[임시비밀번호 발송 실패]', error)
+    alert('이메일 발송 실패: ' + (error?.toString() || error))
+  }
+}
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -1510,7 +1532,39 @@ export default function AdminDashboard() {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="font-medium">{user.email}</p>
+                            <button
+                              className="font-medium underline text-blue-700 hover:text-blue-900 focus:outline-none"
+                              onClick={() => setSelectedUserForActions(user)}
+                            >
+                              {user.email}
+                            </button>
+{selectedUserForActions && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+    <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px]">
+      <h3 className="font-bold mb-2">{selectedUserForActions.email}</h3>
+      <Button
+        className="w-full mb-2"
+        onClick={() => {
+          setShowPasswordReset(selectedUserForActions.id);
+          setSelectedUserForActions(null);
+        }}
+      >비밀번호 변경</Button>
+      <Button
+        className="w-full mb-2 bg-red-600 hover:bg-red-700 text-white"
+        onClick={() => {
+          handleDeleteUser(selectedUserForActions.id, selectedUserForActions.email);
+          setSelectedUserForActions(null);
+        }}
+      >탈퇴(삭제)</Button>
+      <Button
+        className="w-full"
+        variant="outline"
+        onClick={() => setSelectedUserForActions(null)}
+      >닫기</Button>
+    </div>
+  </div>
+)}
+const [selectedUserForActions, setSelectedUserForActions] = useState<any>(null);
                             {user.emailConfirmed ? (
                               <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
                                 ✅ 확인됨
@@ -1578,7 +1632,7 @@ export default function AdminDashboard() {
                           <Button
                             variant="secondary"
                             size="sm"
-                            onClick={() => setShowPasswordReset(user.id)}
+                            onClick={() => handleSendTempPassword(user.email)}
                           >
                             임시비밀번호 보내기
                           </Button>

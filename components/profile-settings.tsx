@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
 interface ProfileSettingsProps {
   onPasswordChangeSuccess?: () => void;
+  onClose?: () => void;
 }
 
-export default function ProfileSettings({ onPasswordChangeSuccess }: ProfileSettingsProps) {
+export default function ProfileSettings({ onPasswordChangeSuccess, onClose }: ProfileSettingsProps) {
   const [passwordError, setPasswordError] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -87,10 +89,22 @@ export default function ProfileSettings({ onPasswordChangeSuccess }: ProfileSett
   }
 
   return (
-  <Card className="max-w-md mx-auto mt-8 border-blue-300 shadow-blue-100">
-      <CardHeader className="bg-blue-50 rounded-t-lg">
-        <CardTitle className="text-blue-700">프로필 관리</CardTitle>
-      </CardHeader>
+    <Card className="max-w-md mx-auto mt-0 border-gray-200 shadow-gray-100">
+      <DialogHeader>
+        <div className="flex items-center justify-between">
+          <DialogTitle>프로필 관리</DialogTitle>
+          {onClose && (
+            <button
+              type="button"
+              aria-label="닫기"
+              className="ml-2 text-gray-400 hover:text-gray-600 text-xl font-bold focus:outline-none"
+              onClick={onClose}
+            >
+              ×
+            </button>
+          )}
+        </div>
+      </DialogHeader>
       <CardContent className="space-y-6">
         <form onSubmit={handleChangePassword} className="space-y-4">
           <div>
@@ -108,12 +122,12 @@ export default function ProfileSettings({ onPasswordChangeSuccess }: ProfileSett
               <div className="text-sm text-red-500 mt-1">{passwordError}</div>
             )}
           </div>
-          <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={isChanging || !!passwordError}>
+          <Button type="submit" className="w-full bg-neutral-700 hover:bg-neutral-800 text-white" disabled={isChanging || !!passwordError}>
             {isChanging ? "변경 중..." : "비밀번호 변경"}
           </Button>
         </form>
         <hr />
-        <Button variant="destructive" className="w-full" onClick={handleDeleteAccount} disabled={isDeleting}>
+        <Button variant="outline" className="w-full text-gray-700 border-gray-300 hover:bg-gray-100" onClick={handleDeleteAccount} disabled={isDeleting}>
           {isDeleting ? "탈퇴 중..." : "회원 탈퇴하기"}
         </Button>
       </CardContent>

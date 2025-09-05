@@ -59,7 +59,9 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/auth/sign-up") ||
     request.nextUrl.pathname === "/auth/callback"
 
-  const isPublicRoute = request.nextUrl.pathname === "/"
+  const isPublicRoute =
+    request.nextUrl.pathname === "/" ||
+    request.nextUrl.pathname.startsWith("/api/admin/send-temp-password")
 
   // 관리자 페이지 접근 제한 (user_profiles의 is_admin 컬럼 사용)
   if (request.nextUrl.pathname.startsWith("/admin")) {

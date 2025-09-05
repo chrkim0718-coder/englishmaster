@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { BookOpen, Play, LogOut, Trophy, Target, BarChart3, Plus, Sparkles, Loader2, X } from "lucide-react"
+import { Dialog, DialogHeader, DialogTitle, DialogContent } from "@/components/ui/dialog"
+import ProfileSettings from "@/components/profile-settings"
 // 게임모드 import 제거
 import { signOut } from "@/lib/actions"
 import QuizInterface from "@/components/quiz-interface"
@@ -20,6 +22,7 @@ interface QuizDashboardProps {
 // 관리자 이메일 목록 제거, DB is_admin 사용
 
 export default function QuizDashboard({ user }: QuizDashboardProps) {
+  const [showProfileDialog, setShowProfileDialog] = useState(false);
   // 게임모드 관련 상태/로직 완전 제거
   const [selectedGrammarType, setSelectedGrammarType] = useState("")
   const [selectedDifficulty, setSelectedDifficulty] = useState("")
@@ -266,9 +269,19 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
               </div>
             </div>
             <div className="grid grid-cols-1 gap-2 w-full sm:flex sm:flex-row sm:items-center sm:gap-4 sm:w-auto">
-              <div className="flex items-center gap-2 text-sm text-gray-600 col-span-1">
-                <BookOpen className="h-4 w-4" />
-                {user.email}
+              <div className="flex flex-col items-start gap-1 text-sm text-gray-600 col-span-1">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4" />
+                  {user.email}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-blue-300 text-blue-600 hover:bg-blue-50 mt-1"
+                  onClick={() => setShowProfileDialog(true)}
+                >
+                  프로필 관리
+                </Button>
               </div>
               {user.is_admin && (
                 <Button
@@ -290,6 +303,16 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
           </div>
         </div>
       </header>
+
+      {/* 프로필 관리 다이얼로그 */}
+      <Dialog open={showProfileDialog} onOpenChange={setShowProfileDialog}>
+        <DialogHeader>
+          <DialogTitle>프로필 관리</DialogTitle>
+        </DialogHeader>
+        <DialogContent>
+          <ProfileSettings onPasswordChangeSuccess={() => setShowProfileDialog(false)} />
+        </DialogContent>
+      </Dialog>
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
