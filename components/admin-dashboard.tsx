@@ -103,6 +103,7 @@ interface ValidationSummary {
 
 export default function AdminDashboard() {
   const [showRadarChart, setShowRadarChart] = useState(false)
+  const [selectedUserForActions, setSelectedUserForActions] = useState<any>(null)
   // 문제 데이터 이슈별 조치 핸들러들
   async function handleAutoFillQuestion(id: string) {
     // 예시: 모든 빈 옵션을 'N/A'로 채움
@@ -1564,7 +1565,6 @@ export default function AdminDashboard() {
     </div>
   </div>
 )}
-const [selectedUserForActions, setSelectedUserForActions] = useState<any>(null);
                             {user.emailConfirmed ? (
                               <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
                                 ✅ 확인됨
