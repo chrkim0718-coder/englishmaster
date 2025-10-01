@@ -110,16 +110,16 @@ export default function LoginForm() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  이메일
+                  이메일 <span className="text-xs text-gray-500">(테스트: demo@demo.com)</span>
                 </label>
-                <Input id="email" name="email" type="email" placeholder="you@example.com" required className="h-12" ref={emailRef} />
+                <Input id="email" name="email" type="email" placeholder="demo@demo.com" required className="h-12" ref={emailRef} />
                 {/* 프로필 관리 버튼 삭제됨 */}
               </div>
               <div className="space-y-2">
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                  비밀번호
+                  비밀번호 <span className="text-xs text-gray-500">(테스트: demo)</span>
                 </label>
-                <Input id="password" name="password" type="password" required className="h-12" />
+                <Input id="password" name="password" type="password" placeholder="demo" required className="h-12" />
               </div>
             </div>
 
