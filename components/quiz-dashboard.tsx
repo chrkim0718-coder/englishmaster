@@ -304,13 +304,35 @@ export default function QuizDashboard({ user }: QuizDashboardProps) {
         </div>
       </header>
 
+      {/* MagicVoca Banner */}
+      <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-b">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              <span className="text-sm text-gray-700">
+                단어 암기도 함께 하고 싶다면?
+              </span>
+            </div>
+            <a
+              href="https://magicvoca.site"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              MagicVoca 바로가기
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          </div>
+        </div>
+      </div>
+
       {/* 프로필 관리 다이얼로그 */}
       <Dialog open={showProfileDialog} onOpenChange={setShowProfileDialog}>
-        <DialogHeader>
-          <DialogTitle>프로필 관리</DialogTitle>
-        </DialogHeader>
         <DialogContent>
-          <ProfileSettings onPasswordChangeSuccess={() => setShowProfileDialog(false)} />
+          <ProfileSettings onPasswordChangeSuccess={() => setShowProfileDialog(false)} onClose={() => setShowProfileDialog(false)} />
         </DialogContent>
       </Dialog>
 
